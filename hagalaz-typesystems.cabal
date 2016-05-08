@@ -1,0 +1,34 @@
+name:                hagalaz-typesystems
+version:             0.1.0.0
+synopsis:            A modelling of typesystems by typeclasses for lambda cube axies and related properties
+description:         Please see README.md
+license:             BSD3
+license-file:        LICENSE
+author:              Fionan Haralddottir
+maintainer:          ma302fh@gold.ac.uk
+copyright:           2016 Fionan Haralddottir
+category:            Typesystem, Educational
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Main
+  build-depends:       base >= 4.7 && < 5
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  default-language:    Haskell2010
+  extensions:          ScopedTypeVariables
+                     , LambdaCase
+
+
+test-suite hagalaz-testing
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , hspec
+                     , QuickCheck
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  default-language:    Haskell2010
+  extensions:          ScopedTypeVariables
+                     , LambdaCase
