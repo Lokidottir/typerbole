@@ -1,6 +1,5 @@
 module Data.Graph.Inductive.Helper where
 
-import           Control.Lens         hiding ((&))
 import           Data.Graph.Inductive as Graph
 import qualified Data.List.Ordered    as Ord
 import qualified Data.Map             as Map
@@ -17,7 +16,7 @@ edgesToGraph :: (Ord a, Graph gr) => [(a, a)] -> (gr a (), Map.Map a Node)
 edgesToGraph es = (mkGraph (swap <$> labeledNodes) (lookupEdge <$> es), nodeMap) where
     -- Function looking up node label pairs to node numbers.
     lookupEdge e = let luEdge = fromJust . (`Map.lookup` nodeMap)
-                   in (luEdge (e^._1), luEdge (e^._2), ())
+                   in (luEdge (fst e), luEdge (snd e), ())
     -- Map of node labels to node numbers
     nodeMap = Map.fromList labeledNodes
     -- ordered list of labeled nodes and node numbers
