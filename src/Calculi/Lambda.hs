@@ -2,6 +2,7 @@ module Calculi.Lambda where
 
 import           Data.Bifoldable
 import           Data.Bifunctor
+import qualified Data.Generics as Generics
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
 import qualified Data.Set                    as Set
@@ -13,11 +14,11 @@ import           Data.Maybe
     A simple lambda calculus AST with Let expressions.
 -}
 data LambdaExpr v t =
-      Var v                                      -- ^ A reference to a variable
-    | Let [LetDeclr v t] (LambdaExpr v t) -- ^ A let expression
-    | Apply (LambdaExpr v t) (LambdaExpr v t)    -- ^ An application of one expression to another
-    | Lambda (v, t) (LambdaExpr v t)             -- ^ A varexpr and a function body
-    deriving (Eq, Ord, Show)
+      Var v                                   -- ^ A reference to a variable
+    | Let [LetDeclr v t] (LambdaExpr v t)     -- ^ A let expression
+    | Apply (LambdaExpr v t) (LambdaExpr v t) -- ^ An application of one expression to another
+    | Lambda (v, t) (LambdaExpr v t)          -- ^ A varexpr and a function body
+    deriving (Eq, Ord, Show, Generics.Typeable, Generics.Data)
 
 type LetDeclr v t = ((v, t), LambdaExpr v t)
 

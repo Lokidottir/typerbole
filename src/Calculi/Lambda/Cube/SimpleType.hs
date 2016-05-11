@@ -21,6 +21,7 @@ module Calculi.Lambda.Cube.SimpleType (
     , isFunction
     , isBase
     , basesOfExpr
+    , envFromExpr
 ) where
 
 import           Calculi.Lambda
@@ -31,6 +32,7 @@ import           Data.Either.Combinators
 import           Data.List
 import qualified Data.Map                as Map
 import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Set                as Set
 
 data TypingEnvironment v t = TypingEnvironment {
@@ -248,4 +250,11 @@ isBase = not . isFunction
     Function retrives a set of all base types in the given lambda expression.
 -}
 basesOfExpr :: SimpleType t => LambdaExpr v t -> Set.Set t
-basesOfExpr = bifoldr (\_ st -> st) (\t st -> bases t `Set.union` st) Set.empty
+basesOfExpr = bifoldr (\_ st -> st) (\t st -> bases t <> st) Set.empty
+
+{-|
+    Get a typing environment that assumes all the base types in an expression
+    are valid.
+-}
+envFromExpr :: SimpleType t => LambdaExpr v t -> TypingEnvironment v t
+envFromExpr = TypingEnvironment Map.empty . basesOfExpr
