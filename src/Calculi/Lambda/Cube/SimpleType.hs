@@ -27,13 +27,12 @@ module Calculi.Lambda.Cube.SimpleType (
 import           Calculi.Lambda
 import           Control.Monad
 import           Data.Bifoldable
-import           Data.Either
-import           Data.Either.Combinators
 import           Data.List
 import qualified Data.Map                as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set                as Set
+import           Test.QuickCheck
 
 data TypingEnvironment v t = TypingEnvironment {
       vars     :: Map.Map v t
@@ -99,11 +98,13 @@ class Ord t => SimpleType t where
 infixr 7 /->
 
 {-|
-    Find the leftmost depth of a type.
+    Find the depth of a type.
 
     @`order` (M → X) = 1@
 
     @`order` ((M → Y) → X) = 2@
+
+    @`order` (M → ((Y → Q) → Z) → X) = 2@
 
     @`order` X = 0@
 -}

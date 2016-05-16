@@ -5,9 +5,11 @@ import           Calculi.Lambda.Cube.SimpleType
 import           Data.Either
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
+import           Data.List.Ordered
 import qualified Data.Map                       as Map
 import           Data.Maybe
 import qualified Data.Set                       as Set
+import           Data.Tuple
 
 type Substitution t = t -> t
 
@@ -57,21 +59,31 @@ class SimpleType t => Polymorphic t where
         This is a lot to ask for, thankfully this is already implemented in terms of
         `substitutions` and `subsToGraph`, this is here in case there's a more efficient
         algorithm the library user knows about.
+
+        Note that this may need renaming, as ()
     -}
     canSubstitute :: t -> t -> Bool
     canSubstitute x y =
+        -- NOTE: This doesn't work as implied by it's name on @canSubstitute (a → K) (M → b)@
+        -- but it this is still valid as far as type theory (and ghci) is concerned
         fromMaybe False (isRight . subsToGraph <$> substitutions x y) || x == y
 
     {-
-        Check if two types are equivalent, where equivalence is defined as each being able
-        to substitute eachother.
+        Check if two types are equivalent, where equivalence is defined as the substitutions
+        being made being symbolically identical, where binds and type variables appear in
+        the same place but may have different names.
 
         @`areEquivalent` (∀ a. X → a) (∀ z. X → z) = True@
+
+        @`areEquivalent` (M → X) (M → X) = True@
 
         @`areEquivalent` (∀ a. a) (∀ z. z → z) = False@
     -}
     areEquivalent :: t -> t -> Bool
-    areEquivalent x y = x `canSubstitute` y && y `canSubstitute` x
+    areEquivalent x y = fromMaybe (x == y) $ do
+        subs1 <- nubSort <$> substitutions x y -- get the sorted substitutions of the first
+        subs2 <- nubSort <$> substitutions y x -- get the sorted substitutions of the second
+        return (subs1 == fmap swap subs2) -- swap the second's elements and check if equal
 
     {-# MINIMAL substitutions, applySubstitution #-}
 

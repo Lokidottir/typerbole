@@ -98,7 +98,7 @@ unlet :: forall v t.
        (Ord v, Ord t)
     => [LetDeclr v t] -- ^ The list of declarations in a let expression
     -> LambdaExpr v t -- ^ The let expression's body
-    -> LambdaExpr v t
+    -> LambdaExpr v t -- ^ The final expression with the same or fewer let expressions
 unlet lets expr =
     let -- Build the dependency graph
         depends :: Gr (LetDeclr v t) () = letsDependency lets

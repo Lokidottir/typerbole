@@ -5,6 +5,8 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
+import           Test.QuickCheck
+import qualified Control.Monad.State            as State
 
 {-|
     Data type describing a type system for simply-typed lambda calculus (λ→).
@@ -32,3 +34,20 @@ instance Ord t => SimpleType (SimplyTyped t) where
 
     bases (Mono t)         = Set.singleton (Mono t)
     bases (Function t1 t2) = bases t1 `Set.union` bases t2
+
+instance (Ord t, Arbitrary t) => Arbitrary (SimplyTyped t) where
+    arbitrary = do
+        let arb' = oneof [Mono <$> (arbitrary :: Gen t), arbitrary :: Gen (SimplyTyped t)]
+        t1 <- arb'
+        t2 <- arb'
+        oneof [pure (t1 /-> t2), pure (t2 /-> t1), arb', arb']
+
+    shrink (Mono _) = []
+    shrink (Function t1 t2) = [t1, t2]
+
+data InferState v t = InferState {
+      subsMade :: Map.Map v [t]
+    , typingEnv :: TypingEnvironment v t
+}
+
+type Infer v t = State.State (InferState v t)

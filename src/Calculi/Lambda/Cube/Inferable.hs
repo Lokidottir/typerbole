@@ -4,10 +4,13 @@
 -}
 module Calculi.Lambda.Cube.Inferable where
 
+import           Calculi.Lambda
 import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
 import qualified Data.Set                        as Set
+import qualified Data.Map                        as Map
+import qualified Control.Monad.State.Lazy        as State
 
 class (Polymorphic t, HigherOrder t) => HMInferable t where
     {-|
