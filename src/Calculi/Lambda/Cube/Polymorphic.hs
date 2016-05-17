@@ -10,11 +10,15 @@ import qualified Data.Map                       as Map
 import           Data.Maybe
 import qualified Data.Set                       as Set
 import           Data.Tuple
+import Debug.Trace
 
+{-|
+    A type alias for substitutions, which are just endomorphisms.
+-}
 type Substitution t = t -> t
 
 -- TODO: Maybe rename the constructors and recomment
-data SubsError t =
+data SubsErr t =
       MultipleSubstitutions t [[t]]
     -- ^ There are multiple possible substitutions, the first argument here
     -- is the type that has multiple substitutions and the second is the
@@ -30,7 +34,7 @@ data SubsError t =
 {-|
     Class of typesystems that exhibit polymorphism.
 -}
-class SimpleType t => Polymorphic t where
+class (SimpleType t) => Polymorphic t where
     {-|
         Generates a list of tuples representing the possible substitutions that
         can be made when the first type is substituting the second.
@@ -110,8 +114,10 @@ infix 6 ≣
 
     TODO: define clashes outside of the internal comments for this function.
     TODO: use fgl's nodemap functionality instead of the hacks that were used here.
+    TODO: check if we should have types as nodes and substitutions as edges instead
+    NOTE: This currently is non-terminating under some unknown circumstances
 -}
-subsToGraph :: forall t. SimpleType t => [(t, t)] -> Either [SubsError (t, t)] (Gr (t, t) ())
+subsToGraph :: forall t. (SimpleType t) => [(t, t)] -> Either [SubsErr (t, t)] (Gr (t, t) ())
 subsToGraph subsPairs
     -- if there are any cycles, return the errors relating to those before they cause problems
     -- in the other checks.

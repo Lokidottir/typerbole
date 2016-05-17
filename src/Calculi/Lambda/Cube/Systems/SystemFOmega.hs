@@ -23,7 +23,7 @@ data SystemFOmega m p =
       -- ^ Explicitly stated mono type of kind @(* → * → *)@ for type application reasons
     | Poly p
       -- ^ A poly type, i.e. the "@a@" in "@∀ a. a → a@"
-    | Bind p (SystemFOmega m p)
+    | Forall p (SystemFOmega m p)
       -- ^ A binding of a poly type variable in an expression, i.e. the "@∀ a.@" in "@∀ a. a@"
     | TypeAp (SystemFOmega m p) (SystemFOmega m p)
       -- ^ Type application.
@@ -36,7 +36,7 @@ instance Bifunctor SystemFOmega where
             Mono m         -> Mono (f m)
             FunctionArrow  -> FunctionArrow
             Poly p         -> Poly (g p)
-            Bind p sf      -> Bind (g p) (bimap' sf)
+            Forall p sf      -> Forall (g p) (bimap' sf)
             TypeAp sf1 sf2 -> TypeAp (bimap' sf1) (bimap' sf2)
 
 instance Bifoldable SystemFOmega where
@@ -46,18 +46,17 @@ instance Bifoldable SystemFOmega where
             Mono m         -> f m z
             FunctionArrow  -> z
             Poly p         -> g p z
-            Bind p sf      -> g p (bifoldr'' z sf)
+            Forall p sf      -> g p (bifoldr'' z sf)
             TypeAp sf1 sf2 -> bifoldr'' (bifoldr'' z sf2) sf1
 
 instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
     abstract a = TypeAp (TypeAp FunctionArrow a)
 
     reify (TypeAp (TypeAp FunctionArrow a) b) = Just (a, b)
-    reify (Bind _ sf)                         = reify sf
     reify _                                   = Nothing
 
     bases = \case
-        Bind p sf    -> Set.insert (Poly p) (bases sf)
+        Forall p sf    -> Set.insert (Poly p) (bases sf)
         TypeAp tl tr -> bases tl `Set.union` bases tr
         a            -> Set.singleton a
 
@@ -65,12 +64,12 @@ instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
 instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
     substitutions _x _y = case (_x, _y) of
         -- need to skip quantifiers on the left hand side
-        (Bind _ sf, y) -> substitutions sf y
+        (Forall _ sf, y) -> substitutions sf y
         -- Only poly types can actually be substituted, so if a poly type is
         -- on the right hand side then the left hand side is it's substitution
         (x, y@Poly{})  -> Just [(x, y)]
-        -- Binds require recursing on it's type expr
-        (x, Bind _ sf) -> substitutions x sf
+        -- Foralls require recursing on it's type expr
+        (x, Forall _ sf) -> substitutions x sf
         (TypeAp tl1 tr1, TypeAp tl2 tr2)
                        -> substitutions tl1 tl2 <> substitutions tr1 tr2
         _              -> Nothing
@@ -84,9 +83,9 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
             p@Poly{}
                 | canSub && p == target -> sub
                 | otherwise             -> p
-            Bind p sf
+            Forall p sf
                 | Poly p == target -> applySubstitution' sf
-                | otherwise        -> Bind p (applySubstitution' sf)
+                | otherwise        -> Forall p (applySubstitution' sf)
             TypeAp tl tr -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
 
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
@@ -95,13 +94,13 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
         -- The function arrow (→ in the psudocode) is a mono type of the kind (* -> * -> *)
         FunctionArrow -> Var FunctionArrow
         p@Poly{}      -> Var p
-        Bind p sf     -> Lambda (Poly p, star) (kind sf)
+        Forall p sf     -> Lambda (Poly p, star) (kind sf)
         TypeAp tl tr  -> Apply (kind tl) (kind tr)
 
     unkind = \case
         Var x                 -> x
         Apply x y             -> TypeAp (unkind x) (unkind y)
-        Lambda (Poly p, _) sf -> Bind p (unkind sf)
+        Lambda (Poly p, _) sf -> Forall p (unkind sf)
         Lambda _ _            -> error "(SystemFOmega) non-poly variable bound by lambda during unkinding"
         lt@Let{}              ->
             case deepUnlet lt of
@@ -112,7 +111,7 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
 instance (Ord m, Ord p, Enum p) => HMInferable (SystemFOmega m p) where
     ftvs = \case
         poly@(Poly _) -> Set.singleton poly
-        Bind p sf     -> Set.delete (Poly p) (ftvs sf)
+        Forall p sf     -> Set.delete (Poly p) (ftvs sf)
         TypeAp tl tr  -> ftvs tl `Set.union` ftvs tr
         _             -> Set.empty
 
@@ -123,13 +122,13 @@ instance (Ord m, Ord p, Enum p) => HMInferable (SystemFOmega m p) where
 instance (Ord m, Ord p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m p) where
     arbitrary = do
         let arbApTy = TypeAp <$> arbitrary <*> arbitrary
-        let arbBind = Bind <$> arbitrary <*> arbitrary
+        let arbForall = Forall <$> arbitrary <*> arbitrary
         let arbFun  = abstract <$> arbitrary <*> arbitrary
         let arbBase = [Poly <$> arbitrary, Mono <$> arbitrary]
-        oneof ([arbApTy, arbBind, arbFun] ++ arbBase)
+        oneof ([arbApTy, arbForall, arbFun] ++ arbBase)
 
     shrink (TypeAp x y) = [x, y]
-    shrink (Bind _ sf) = [sf]
+    shrink (Forall _ sf) = [sf]
     shrink _ = []
 
 {-|
@@ -143,5 +142,5 @@ markAsFunctionArrow sub = \case
         | otherwise -> m
     FunctionArrow -> FunctionArrow
     Poly x -> Poly x
-    Bind p st -> Bind p (markAsFunctionArrow sub st)
+    Forall p st -> Forall p (markAsFunctionArrow sub st)
     TypeAp t1 t2 -> TypeAp (markAsFunctionArrow sub t1) (markAsFunctionArrow sub t2)
