@@ -8,6 +8,7 @@ import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
 import           Data.Bifoldable
 import           Data.Bifunctor
+import           Data.Bifunctor.TH
 import           Data.Semigroup
 import qualified Data.Set                        as Set
 import qualified Data.Map                        as Map
@@ -29,25 +30,9 @@ data SystemFOmega m p =
       -- ^ Type application.
     deriving (Eq, Ord, Show, Read)
 
-instance Bifunctor SystemFOmega where
-    bimap f g =
-        let bimap' = bimap f g
-        in \case
-            Mono m         -> Mono (f m)
-            FunctionArrow  -> FunctionArrow
-            Poly p         -> Poly (g p)
-            Forall p sf      -> Forall (g p) (bimap' sf)
-            TypeAp sf1 sf2 -> TypeAp (bimap' sf1) (bimap' sf2)
-
-instance Bifoldable SystemFOmega where
-    bifoldr f g z _sf =
-        let bifoldr'' = bifoldr f g
-        in case _sf of
-            Mono m         -> f m z
-            FunctionArrow  -> z
-            Poly p         -> g p z
-            Forall p sf      -> g p (bifoldr'' z sf)
-            TypeAp sf1 sf2 -> bifoldr'' (bifoldr'' z sf2) sf1
+deriveBifunctor ''SystemFOmega
+deriveBifoldable ''SystemFOmega
+deriveBitraversable ''SystemFOmega
 
 instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
     abstract a = TypeAp (TypeAp FunctionArrow a)
@@ -62,31 +47,33 @@ instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
 
 
 instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
-    substitutions _x _y = case (_x, _y) of
+    substitutions = curry $ \case
         -- need to skip quantifiers on the left hand side
-        (Forall _ sf, y) -> substitutions sf y
+        (Forall _ expr, target) -> substitutions expr target
         -- Only poly types can actually be substituted, so if a poly type is
         -- on the right hand side then the left hand side is it's substitution
-        (x, y@Poly{})  -> Just [(x, y)]
+        (expr, target@Poly{})    -> Just [(expr, target)]
         -- Foralls require recursing on it's type expr
-        (x, Forall _ sf) -> substitutions x sf
+        (expr, Forall _ target) -> substitutions expr target
         (TypeAp tl1 tr1, TypeAp tl2 tr2)
-                       -> substitutions tl1 tl2 <> substitutions tr1 tr2
-        _              -> Nothing
+                         -> (<>) <$> substitutions tl1 tl2 <*> substitutions tr1 tr2
+        (expr, target)
+            | expr == target -> Just []
+            | otherwise -> Nothing
 
     applySubstitution sub target = applySubstitution' where
         canSub = sub `canSubstitute` target
         -- Might have a case of premature best-practices
         applySubstitution' = \case
-            m@Mono{} -> m
-            FunctionArrow -> FunctionArrow
+            m@Mono{}                         -> m
+            FunctionArrow                    -> FunctionArrow
             p@Poly{}
-                | canSub && p == target -> sub
-                | otherwise             -> p
+                | canSub && p == target      -> sub
+                | otherwise                  -> p
             Forall p sf
-                | Poly p == target -> applySubstitution' sf
-                | otherwise        -> Forall p (applySubstitution' sf)
-            TypeAp tl tr -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
+                | canSub && Poly p == target -> applySubstitution' sf
+                | otherwise                  -> Forall p (applySubstitution' sf)
+            TypeAp tl tr                     -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
 
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
     kind = \case

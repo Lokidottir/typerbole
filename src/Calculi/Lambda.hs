@@ -1,7 +1,7 @@
 module Calculi.Lambda where
 
 import           Data.Bifoldable
-import           Data.Bifunctor
+import           Data.Bifunctor.TH
 import qualified Data.Generics as Generics
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
@@ -22,22 +22,11 @@ data LambdaExpr v t =
 
 type LetDeclr v t = ((v, t), LambdaExpr v t)
 
+deriveBifunctor ''LambdaExpr
+deriveBifoldable ''LambdaExpr
+deriveBitraversable ''LambdaExpr
+
 type UntypedLambdaExpr v = LambdaExpr v ()
-
-instance Bifunctor LambdaExpr where
-    bimap f g lx = case lx of
-        Var v               -> Var (f v)
-        Let lets expr       -> Let (bimap (bimap f g) (bimap f g) <$> lets) (bimap f g expr)
-        Apply fun arg       -> Apply (bimap f g fun) (bimap f g arg)
-        Lambda constrs expr -> Lambda (bimap f g constrs) (bimap f g expr)
-
-instance Bifoldable LambdaExpr where
-    bifoldr f g z lx = case lx of
-        Var v               -> f v z
-        Let lets expr       ->
-            bifoldr f g (foldr (\(declr, lexpr) st -> bifoldr f g (bifoldr f g st lexpr) declr) z lets) expr
-        Apply fun arg       -> bifoldr f g (bifoldr f g z arg) fun
-        Lambda constrs expr -> bifoldr f g (bifoldr f g z expr) constrs
 
 {-|
     Given the contents of a let expression's declarations, generate a graph

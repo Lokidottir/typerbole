@@ -1,8 +1,9 @@
-
+{-# LANGUAGE BangPatterns #-}
 import Calculi.Lambda
 import Calculi.Lambda.Cube
 import Calculi.Lambda.Cube.Systems.SimplyTyped as ST
 import Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
+import Calculi.Lambda.Cube.Systems.SystemF as SF
 import Test.QuickCheck
 import Test.Hspec
 import Test.Hspec.QuickCheck
@@ -12,28 +13,37 @@ import Data.Maybe
 
 main :: IO ()
 main = hspec $ do
-        describe "SimplyTyped" $
-            followsSimpleType (arbitrary :: Gen SimplyTyped')
-        describe "System-Fω" $ do
-            followsSimpleType (arbitrary :: Gen SystemFOmega')
-            followsPolymorphic (arbitrary :: Gen SystemFOmega')
+        describe "Type systems follow laws and properties" $ do
+            describe "SimplyTyped" $
+                followsSimpleType (arbitrary :: Gen SimplyTyped')
+            -- describe "System-F" $ do
+            --     followsSimpleType (arbitrary :: Gen SystemF')
+            --     followsPolymorphic (arbitrary :: Gen SystemF')
+            describe "System-Fω" $ do
+                followsSimpleType (arbitrary :: Gen SystemFOmega')
+                followsPolymorphic (arbitrary :: Gen SystemFOmega')
+                followsHigherOrder (arbitrary :: Gen SystemFOmega')
 
 
 type SimplyTyped' = SimplyTyped Integer
 type SystemFOmega' = SystemFOmega Integer Integer
+type SystemF' = SF.SystemF Integer Integer
 
-followsSimpleType :: forall t. (SimpleType t) => Gen t -> Spec
-followsSimpleType gen =
+followsSimpleType ::(SimpleType t) => Gen t -> Spec
+followsSimpleType gen = describe "SimpleType laws and properties" $
     prop "follows abstract-reify inverse law" $ abstractInverse <$> gen <*> gen
 
-followsPolymorphic :: forall t. (Polymorphic t) => Gen t -> Spec
-followsPolymorphic gen = do
-    prop "equivalence is reflexive" $ do
-        ty <- gen
-        return (ty ≣ ty)
-    prop "substitution is reflexive" $ do
-        ty <- gen
-        return (ty `canSubstitute` ty)
+followsPolymorphic :: (Polymorphic t) => Gen t -> Spec
+followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
+    prop "equivalence is reflexive" $
+        (\ !ty -> ty ≣ ty) <$> gen
+    prop "substitution is reflexive" $
+        (\ !ty -> ty `canSubstitute` ty) <$> gen
+
+followsHigherOrder :: (HigherOrder t) => Gen t -> Spec
+followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
+    prop "unkind is inverse of kind" $
+        (\ty -> unkind (kind ty) == ty) <$> gen
 
 {-|
     An expression of type "(0 -> 5) -> 0 -> 5"
@@ -45,4 +55,4 @@ expr1 = Lambda (1, ST.Mono 0 /-> ST.Mono 5) (Lambda (2, ST.Mono 0) (Var 1 `Apply
     Check that `reify` is the inverse (within a Maybe) of `abstract`.
 -}
 abstractInverse :: (SimpleType t) => t -> t -> Bool
-abstractInverse ta tb = fmap (uncurry abstract) (reify (ta /-> tb)) == Just (ta /-> tb)
+abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
