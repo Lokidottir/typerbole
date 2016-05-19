@@ -1,14 +1,15 @@
 module Calculi.Lambda where
 
-import           Data.Bifoldable
 import           Data.Bifunctor.TH
-import qualified Data.Generics as Generics
+import           Data.Generics (Data(..))
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
 import qualified Data.Set                    as Set
 import qualified Data.Map                    as Map
 import           Data.Semigroup
 import           Data.Maybe
+import Test.QuickCheck
+import Data.Random.Generics
 
 {-|
     A simple lambda calculus AST with Let expressions.
@@ -18,13 +19,17 @@ data LambdaExpr v t =
     | Let [LetDeclr v t] (LambdaExpr v t)     -- ^ A let expression
     | Apply (LambdaExpr v t) (LambdaExpr v t) -- ^ An application of one expression to another
     | Lambda (v, t) (LambdaExpr v t)          -- ^ A varexpr and a function body
-    deriving (Eq, Ord, Show, Generics.Typeable, Generics.Data)
+    deriving (Eq, Ord, Show, Data)
 
 type LetDeclr v t = ((v, t), LambdaExpr v t)
 
 deriveBifunctor ''LambdaExpr
 deriveBifoldable ''LambdaExpr
 deriveBitraversable ''LambdaExpr
+
+instance (Arbitrary v, Data v, Arbitrary t, Data t) => Arbitrary (LambdaExpr v t) where
+    -- TODO: Remove the instances of Data for v and t
+    arbitrary = sized generatorP
 
 type UntypedLambdaExpr v = LambdaExpr v ()
 

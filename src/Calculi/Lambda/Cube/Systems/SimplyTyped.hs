@@ -6,6 +6,8 @@ import           Calculi.Lambda.Cube.SimpleType
 import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
 import           Test.QuickCheck
+import           Data.Generics
+import           Data.Random.Generics
 import qualified Control.Monad.State            as State
 
 {-|
@@ -14,7 +16,7 @@ import qualified Control.Monad.State            as State
 data SimplyTyped t =
       Mono t
     | Function (SimplyTyped t) (SimplyTyped t)
-    deriving (Show, Read, Eq, Ord)
+    deriving (Show, Read, Eq, Ord, Data)
 
 instance Functor SimplyTyped where
     fmap f = \case
@@ -35,15 +37,9 @@ instance Ord t => SimpleType (SimplyTyped t) where
     bases (Mono t)         = Set.singleton (Mono t)
     bases (Function t1 t2) = bases t1 `Set.union` bases t2
 
-instance (Ord t, Arbitrary t) => Arbitrary (SimplyTyped t) where
-    arbitrary = do
-        let arb' = oneof [Mono <$> (arbitrary :: Gen t), arbitrary :: Gen (SimplyTyped t)]
-        t1 <- arb'
-        t2 <- arb'
-        oneof [pure (t1 /-> t2), pure (t2 /-> t1), arb', arb']
-
-    shrink (Mono _) = []
-    shrink (Function t1 t2) = [t1, t2]
+instance (Data t, Arbitrary t) => Arbitrary (SimplyTyped t) where
+    -- TODO: remove instance of Data for t
+    arbitrary = sized generatorP
 
 data InferState v t = InferState {
       subsMade :: Map.Map v [t]

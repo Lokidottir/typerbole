@@ -9,6 +9,8 @@ import           Calculi.Lambda.Cube.SimpleType
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bifunctor.TH
+import           Data.Generics
+import           Data.Random.Generics
 import           Data.Semigroup
 import qualified Data.Set                        as Set
 import qualified Data.Map                        as Map
@@ -28,7 +30,7 @@ data SystemFOmega m p =
       -- ^ A binding of a poly type variable in an expression, i.e. the "@∀ a.@" in "@∀ a. a@"
     | TypeAp (SystemFOmega m p) (SystemFOmega m p)
       -- ^ Type application.
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Data)
 
 deriveBifunctor ''SystemFOmega
 deriveBifoldable ''SystemFOmega
@@ -106,17 +108,9 @@ instance (Ord m, Ord p, Enum p) => HMInferable (SystemFOmega m p) where
         -- Find the largest poly element in the type expression
         maxP = maximum (bifoldr (flip const) max (toEnum 0) <$> vars env)
 
-instance (Ord m, Ord p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m p) where
-    arbitrary = do
-        let arbApTy = TypeAp <$> arbitrary <*> arbitrary
-        let arbForall = Forall <$> arbitrary <*> arbitrary
-        let arbFun  = abstract <$> arbitrary <*> arbitrary
-        let arbBase = [Poly <$> arbitrary, Mono <$> arbitrary]
-        oneof ([arbApTy, arbForall, arbFun] ++ arbBase)
-
-    shrink (TypeAp x y) = [x, y]
-    shrink (Forall _ sf) = [sf]
-    shrink _ = []
+instance (Data m, Data p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m p) where
+    -- TODO: remove instances of Data for m and p
+    arbitrary = sized generatorP
 
 {-|
     Given a function arrow representation of type @m@, replace all

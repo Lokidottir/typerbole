@@ -4,8 +4,10 @@ import Data.Bifunctor.TH
 import Calculi.Lambda.Cube.SimpleType
 import Calculi.Lambda.Cube.Polymorphic
 import qualified Data.Set as Set
+import Data.Random.Generics
 import Data.Generics
 import Data.Monoid
+import Test.QuickCheck
 
 {-|
     An implementation of System-F, similar to haskell's own typesystems but without
@@ -56,3 +58,7 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
                 | canSub && Poly p == target -> applySubstitution' expr
                 | otherwise                  -> Forall p (applySubstitution' expr)
             Function fune arge               -> Function (applySubstitution' fune) (applySubstitution' arge)
+
+instance (Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
+    -- TODO: remove instances of Data for m and p
+    arbitrary = sized generatorP

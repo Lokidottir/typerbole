@@ -9,21 +9,18 @@ import Test.Hspec
 import Test.Hspec.QuickCheck
 import Data.Maybe
 
-
-
 main :: IO ()
 main = hspec $ do
         describe "Type systems follow laws and properties" $ do
             describe "SimplyTyped" $
                 followsSimpleType (arbitrary :: Gen SimplyTyped')
-            -- describe "System-F" $ do
-            --     followsSimpleType (arbitrary :: Gen SystemF')
-            --     followsPolymorphic (arbitrary :: Gen SystemF')
+            describe "System-F" $ do
+                followsSimpleType (arbitrary :: Gen SystemF')
+                followsPolymorphic (arbitrary :: Gen SystemF')
             describe "System-Fω" $ do
                 followsSimpleType (arbitrary :: Gen SystemFOmega')
                 followsPolymorphic (arbitrary :: Gen SystemFOmega')
                 followsHigherOrder (arbitrary :: Gen SystemFOmega')
-
 
 type SimplyTyped' = SimplyTyped Integer
 type SystemFOmega' = SystemFOmega Integer Integer
@@ -33,7 +30,7 @@ followsSimpleType ::(SimpleType t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $
     prop "follows abstract-reify inverse law" $ abstractInverse <$> gen <*> gen
 
-followsPolymorphic :: (Polymorphic t) => Gen t -> Spec
+followsPolymorphic :: (Polymorphic t, Show t, Arbitrary t) => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "equivalence is reflexive" $
         (\ !ty -> ty ≣ ty) <$> gen
