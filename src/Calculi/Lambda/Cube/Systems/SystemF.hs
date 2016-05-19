@@ -1,13 +1,13 @@
 module Calculi.Lambda.Cube.Systems.SystemF where
 
-import Data.Bifunctor.TH
-import Calculi.Lambda.Cube.SimpleType
-import Calculi.Lambda.Cube.Polymorphic
+import           Data.Bifunctor.TH
+import           Calculi.Lambda.Cube.SimpleType
+import           Calculi.Lambda.Cube.Polymorphic
 import qualified Data.Set as Set
-import Data.Random.Generics
-import Data.Generics
-import Data.Monoid
-import Test.QuickCheck
+import           Data.Random.Generics
+import           Data.Generics
+import           Data.Monoid
+import           Test.QuickCheck
 
 {-|
     An implementation of System-F, similar to haskell's own typesystems but without

@@ -28,10 +28,10 @@ import           Calculi.Lambda
 import           Control.Monad
 import           Data.Bifoldable
 import           Data.List
-import qualified Data.Map                as Map
+import qualified Data.Map        as Map
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set                as Set
+import qualified Data.Set        as Set
 import           Test.QuickCheck
 
 data TypingEnvironment v t = TypingEnvironment {

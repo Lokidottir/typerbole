@@ -4,12 +4,12 @@ import           Data.Bifunctor.TH
 import           Data.Generics (Data(..))
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
-import qualified Data.Set                    as Set
 import qualified Data.Map                    as Map
-import           Data.Semigroup
 import           Data.Maybe
-import Test.QuickCheck
-import Data.Random.Generics
+import           Data.Random.Generics
+import           Data.Semigroup
+import qualified Data.Set                    as Set
+import           Test.QuickCheck
 
 {-|
     A simple lambda calculus AST with Let expressions.

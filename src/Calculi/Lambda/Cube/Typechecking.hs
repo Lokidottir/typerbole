@@ -27,8 +27,8 @@ type Report v t err = Either err (LambdaExpr v t)
     itself.
 -}
 data ErrorContext env v t err = ErrorContext {
-      expression :: LambdaExpr v t
-    , environment :: env v t
+      expression     :: LambdaExpr v t
+    , environment    :: env v t
     , errorOfContext :: err
 } deriving (Eq, Ord, Show)
 

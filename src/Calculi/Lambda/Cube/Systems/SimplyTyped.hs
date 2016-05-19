@@ -3,12 +3,12 @@ module Calculi.Lambda.Cube.Systems.SimplyTyped where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
+import qualified Control.Monad.State            as State
+import           Data.Generics
 import qualified Data.Map                       as Map
+import           Data.Random.Generics
 import qualified Data.Set                       as Set
 import           Test.QuickCheck
-import           Data.Generics
-import           Data.Random.Generics
-import qualified Control.Monad.State            as State
 
 {-|
     Data type describing a type system for simply-typed lambda calculus (λ→).
@@ -42,7 +42,7 @@ instance (Data t, Arbitrary t) => Arbitrary (SimplyTyped t) where
     arbitrary = sized generatorP
 
 data InferState v t = InferState {
-      subsMade :: Map.Map v [t]
+      subsMade  :: Map.Map v [t]
     , typingEnv :: TypingEnvironment v t
 }
 

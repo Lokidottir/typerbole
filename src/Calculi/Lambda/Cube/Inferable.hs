@@ -8,9 +8,9 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
-import qualified Data.Set                        as Set
-import qualified Data.Map                        as Map
 import qualified Control.Monad.State.Lazy        as State
+import qualified Data.Map                        as Map
+import qualified Data.Set                        as Set
 
 class (Polymorphic t, HigherOrder t) => HMInferable t where
     {-|

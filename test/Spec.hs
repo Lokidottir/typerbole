@@ -1,13 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
-import Calculi.Lambda
-import Calculi.Lambda.Cube
-import Calculi.Lambda.Cube.Systems.SimplyTyped as ST
-import Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
-import Calculi.Lambda.Cube.Systems.SystemF as SF
-import Test.QuickCheck
-import Test.Hspec
-import Test.Hspec.QuickCheck
-import Data.Maybe
+import           Calculi.Lambda
+import           Calculi.Lambda.Cube
+import           Calculi.Lambda.Cube.Systems.SimplyTyped  as ST
+import           Calculi.Lambda.Cube.Systems.SystemF      as SF
+import           Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
+import           Data.Maybe
+import           Test.Hspec
+import           Test.Hspec.QuickCheck
+import           Test.QuickCheck
 
 main :: IO ()
 main = hspec $ do
