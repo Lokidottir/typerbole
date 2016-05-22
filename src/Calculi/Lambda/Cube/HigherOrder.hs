@@ -49,37 +49,37 @@ class SimpleType t => HigherOrder t where
         More generalised form of `abstract` to work on all type operators, not
         just function types.
 
-        @`applyType` M (∀a. a) = (∀ a. M a)@
+        @`typeap` M (∀a. a) = (∀ a. M a)@
 
-        @`applyType` T X       = (T X)@
+        @`typeap` T X       = (T X)@
 
-        @`applyType` (`applyType` ((→)) A) B ≡ `abstract` A B@
+        @`typeap` (`typeap` ((→)) A) B ≡ `abstract` A B@
     -}
-    applyType :: t -> t -> t
-    applyType a b = unkind (Apply (kind a) (kind b))
+    typeap :: t -> t -> t
+    typeap a b = unkind (Apply (kind a) (kind b))
 
     {-|
         More generalised form of `reify`, working on all type application.
 
-        @`dissectType` (M x)   = Just (M, x)@
+        @`untypeap` (M x)   = Just (M, x)@
 
-        @`dissectType` (X → Y) = Just (((→) X), Y)@
+        @`untypeap` (X → Y) = Just (((→) X), Y)@
 
-        @`dissectType` X       = Nothing@
+        @`untypeap` X       = Nothing@
     -}
-    dissectType :: t -> Maybe (t, t)
-    dissectType x = case kind x of
+    untypeap :: t -> Maybe (t, t)
+    untypeap x = case kind x of
         Apply a b -> Just (unkind a, unkind b)
         _         -> Nothing
 
     {-# MINIMAL kind, unkind #-}
 
 {-|
-    Infix `applyType`.
+    Infix `typeap`.
 -}
-($^) :: (HigherOrder t) => t -> t -> t
-($^) = applyType
-infixl 8 $^
+(/$) :: (HigherOrder t) => t -> t -> t
+(/$) = typeap
+infixl 8 /$
 
 {-|
     Shorthand for @`SimplyTyped.Mono` `Star`@ which can look messy in implementations.

@@ -17,7 +17,7 @@ data SystemF m p =
       Mono m
     | Poly p
     | Function (SystemF m p) (SystemF m p)
-    | Forall p (SystemF m p)
+    | Forall (SystemF m p) (SystemF m p)
     deriving (Eq, Ord, Show, Read, Data)
 
 deriveBifunctor ''SystemF
@@ -32,7 +32,7 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     bases = \case
         Function fun arg -> bases fun <> bases arg
-        Forall p expr    -> Set.insert (Poly p) (bases expr)
+        Forall p expr    -> Set.insert p (bases expr)
         expr             -> Set.singleton expr
 
 instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
@@ -50,14 +50,18 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
         canSub = sub `canSubstitute` target
 
         applySubstitution' = \case
-            m@Mono{}                         -> m
+            m@Mono{}                     -> m
             p@Poly{}
-                | canSub && p == target      -> sub
-                | otherwise                  -> p
+                | canSub && p == target  -> sub
+                | otherwise              -> p
             Forall p expr
-                | canSub && Poly p == target -> applySubstitution' expr
-                | otherwise                  -> Forall p (applySubstitution' expr)
-            Function fune arge               -> Function (applySubstitution' fune) (applySubstitution' arge)
+                | canSub &&  p == target -> applySubstitution' expr
+                | otherwise              -> Forall p (applySubstitution' expr)
+            Function fune arge           -> Function (applySubstitution' fune) (applySubstitution' arge)
+
+    quantify = Forall
+    unquantify (Forall a b) = Just (a, b)
+    unquantify _ = Nothing
 
 instance (Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p

@@ -26,7 +26,7 @@ data SystemFOmega m p =
       -- ^ Explicitly stated mono type of kind @(* → * → *)@ for type application reasons
     | Poly p
       -- ^ A poly type, i.e. the "@a@" in "@∀ a. a → a@"
-    | Forall p (SystemFOmega m p)
+    | Forall (SystemFOmega m p) (SystemFOmega m p)
       -- ^ A binding of a poly type variable in an expression, i.e. the "@∀ a.@" in "@∀ a. a@"
     | TypeAp (SystemFOmega m p) (SystemFOmega m p)
       -- ^ Type application.
@@ -43,7 +43,7 @@ instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
     reify _                                   = Nothing
 
     bases = \case
-        Forall p sf    -> Set.insert (Poly p) (bases sf)
+        Forall p sf  -> Set.insert (p) (bases sf)
         TypeAp tl tr -> bases tl `Set.union` bases tr
         a            -> Set.singleton a
 
@@ -73,9 +73,13 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
                 | canSub && p == target      -> sub
                 | otherwise                  -> p
             Forall p sf
-                | canSub && Poly p == target -> applySubstitution' sf
+                | canSub && p == target -> applySubstitution' sf
                 | otherwise                  -> Forall p (applySubstitution' sf)
             TypeAp tl tr                     -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
+
+    quantify = Forall
+    unquantify (Forall a b) = Just (a, b)
+    unquantify _ = Nothing
 
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
     kind = \case
@@ -83,24 +87,27 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
         -- The function arrow (→ in the psudocode) is a mono type of the kind (* -> * -> *)
         FunctionArrow -> Var FunctionArrow
         p@Poly{}      -> Var p
-        Forall p sf     -> Lambda (Poly p, star) (kind sf)
+        Forall p sf   -> Lambda (p, star) (kind sf)
         TypeAp tl tr  -> Apply (kind tl) (kind tr)
 
     unkind = \case
         Var x                 -> x
         Apply x y             -> TypeAp (unkind x) (unkind y)
-        Lambda (Poly p, _) sf -> Forall p (unkind sf)
-        Lambda _ _            -> error "(SystemFOmega) non-poly variable bound by lambda during unkinding"
+        Lambda (p, _) sf -> Forall p (unkind sf)
         lt@Let{}              ->
             case deepUnlet lt of
                 Let{} -> error "(SystemFOmega) cyclic let expression during unkinding"
                 sf    -> unkind sf
 
+    typeap = TypeAp
+    untypeap (TypeAp a b) = Just (a, b)
+    untypeap _ = Nothing
+
 
 instance (Ord m, Ord p, Enum p) => HMInferable (SystemFOmega m p) where
     ftvs = \case
         poly@(Poly _) -> Set.singleton poly
-        Forall p sf     -> Set.delete (Poly p) (ftvs sf)
+        Forall p sf     -> Set.delete p (ftvs sf)
         TypeAp tl tr  -> ftvs tl `Set.union` ftvs tr
         _             -> Set.empty
 

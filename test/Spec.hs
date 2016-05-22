@@ -36,11 +36,13 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (\ !ty -> ty ≣ ty) <$> gen
     prop "substitution is reflexive" $
         (\ !ty -> ty `canSubstitute` ty) <$> gen
+    prop "follows quantify-unquantify inverse law" $ quantifyInverse <$> gen <*> gen
 
 followsHigherOrder :: (HigherOrder t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
     prop "unkind is inverse of kind" $
         (\ty -> unkind (kind ty) == ty) <$> gen
+    prop "dissectType is inverse of applyType"
 
 {-|
     An expression of type "(0 -> 5) -> 0 -> 5"
@@ -53,3 +55,6 @@ expr1 = Lambda (1, ST.Mono 0 /-> ST.Mono 5) (Lambda (2, ST.Mono 0) (Var 1 `Apply
 -}
 abstractInverse :: (SimpleType t) => t -> t -> Bool
 abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
+
+quantifyInverse :: Polymorphic t => t -> t -> Bool
+quantifyInverse !ta !tb = fmap (uncurry quantify) (unquantify (quantify ta tb)) == Just (quantify ta tb)

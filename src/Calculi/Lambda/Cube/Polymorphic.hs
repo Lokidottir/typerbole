@@ -31,6 +31,8 @@ data SubsErr t =
     -- while the second is a list of paths from the root.
     deriving (Eq, Ord, Show, Read)
 
+data InferenceEnvironment v t = InferenceEnvironment
+
 {-|
     Class of typesystems that exhibit polymorphism.
 -}
@@ -56,6 +58,23 @@ class (SimpleType t) => Polymorphic t where
     applySubstitution :: t -> t -> Substitution t
 
     {-|
+        Quantify instances of a type variable in a type expression.
+
+        @`quantify` a (a → X) = (∀ a. a → X)@
+    -}
+    quantify :: t -> t -> t
+
+    {-|
+        Split a quantification into it's variable being quantified and
+        the expression targeted by the quantification. A safe inverse of `quantify`.
+
+        @`unquantify` (∀ a. M → a) = Just (a, M → a)@
+
+        @`unquantify` (X → b) = Nothing@
+    -}
+    unquantify :: t -> Maybe (t, t)
+
+    {-|
         Calculate if one type can substitute another, should check if there are any error in the
         substitutions such as cycles or multiple possible substitutions, then return true if
         either both are identical or the substitutions don't conflict.
@@ -63,8 +82,6 @@ class (SimpleType t) => Polymorphic t where
         This is a lot to ask for, thankfully this is already implemented in terms of
         `substitutions` and `subsToGraph`, this is here in case there's a more efficient
         algorithm the library user knows about.
-
-        Note that this may need renaming, as ()
     -}
     canSubstitute :: t -> t -> Bool
     canSubstitute x y =
@@ -89,8 +106,6 @@ class (SimpleType t) => Polymorphic t where
         subs2 <- nubSort <$> substitutions y x -- get the sorted substitutions of the second
         return (subs1 == fmap swap subs2) -- swap the second's elements and check if equal
 
-    {-# MINIMAL substitutions, applySubstitution #-}
-
 {-|
     Infix, flipped `canSubstitute` corresponding to the type ordering operator used in
     much of type theory.
@@ -98,7 +113,7 @@ class (SimpleType t) => Polymorphic t where
 (⊑) :: Polymorphic t => t -> t -> Bool
 (⊑) = flip canSubstitute
 
-infix 6 ⊑
+infix 4 ⊑
 
 {-|
     Infix `areEquivalent`
@@ -106,7 +121,15 @@ infix 6 ⊑
 (≣) :: Polymorphic t => t -> t -> Bool
 (≣) = areEquivalent
 
-infix 6 ≣
+infix 4 ≣
+
+{-|
+    Infix `quantify`, looks a bit like @∀@ but doesn't interfere with unicode syntax extensions.
+-}
+(\-/) :: Polymorphic t => t -> t -> t
+(\-/) = quantify
+
+infixr 6 \-/
 
 {-|
     Given a list of substitutions, i.e. the output of `substitutions`, generate a graph
