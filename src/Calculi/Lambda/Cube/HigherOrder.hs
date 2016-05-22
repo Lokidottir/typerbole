@@ -43,7 +43,7 @@ class SimpleType t => HigherOrder t where
         Translate a kindedness expression back to a type, functionally the inverse of
         `kind`.
     -}
-    unkind :: Kindedness t -> t
+    unkind :: Kindedness t -> Maybe t
 
     {-|
         More generalised form of `abstract` to work on all type operators, not
@@ -56,7 +56,6 @@ class SimpleType t => HigherOrder t where
         @`typeap` (`typeap` ((→)) A) B ≡ `abstract` A B@
     -}
     typeap :: t -> t -> t
-    typeap a b = unkind (Apply (kind a) (kind b))
 
     {-|
         More generalised form of `reify`, working on all type application.
@@ -69,7 +68,7 @@ class SimpleType t => HigherOrder t where
     -}
     untypeap :: t -> Maybe (t, t)
     untypeap x = case kind x of
-        Apply a b -> Just (unkind a, unkind b)
+        Apply a b -> (,) <$> unkind a <*> unkind b
         _         -> Nothing
 
     {-# MINIMAL kind, unkind #-}

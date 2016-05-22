@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-|
     Module describing a typeclass for types with stronger mathematical foundations that
     represents a type system for simply-typed lambda calculus (λ→ on the lambda cube).
@@ -43,7 +42,15 @@ data TypingEnvironment v t = TypingEnvironment {
     Typeclass based off simply-typed lambda calculus + a method for getting all
     the base types in a type.
 -}
-class Ord t => SimpleType t where
+class (Ord t) => SimpleType t where
+    {-|
+        The representation of a Mono type, also sometimes referred to a type constant.
+
+        in the type expression @A → M@, both @A@ and @M@ are mono types, but in a polymorphic
+        type expression such as @∀ a. a → X@, @a@ is not a mono type.
+    -}
+    type MonoType t :: *
+
     {-|
         Given two types, generate a new type representing the type of a function from
         the first type to the second.
@@ -54,7 +61,7 @@ class Ord t => SimpleType t where
 
         @`abstract` (∀ a. a) T = (∀ a. a → T)@
 
-        @`abstract` a t = (a → t) @
+        @`abstract` a t = (a → t)@
     -}
     abstract :: t -> t -> t
 
@@ -87,6 +94,12 @@ class Ord t => SimpleType t where
         @`bases` (M X → (X → Z) → M Z) = Set.fromList [M, X, Z] -- or Set.fromList [M, X, Z, →], depending@
     -}
     bases :: t -> Set.Set t
+
+    {-|
+        Polymorphic constructor synonym, as many implementations will have a constructor along
+        the lines of "Mono m".
+    -}
+    mono :: MonoType t -> t
 
 {-|
     Infix `abstract` with the appearence of @↦@, which is used to denote function
@@ -195,7 +208,7 @@ typecheckSTLC rep env expr = case expr of
             Just t -> Right t
     Let lets expr' ->
         case unlet lets expr' of
-            lexpr@(Let lets' _) -> Left [cyclicLet rep lets' expr env]
+            Let lets' _ -> Left [cyclicLet rep lets' expr env]
             expr''              -> typecheckSTLC rep env expr''
     Apply fun arg ->
         let fun' = typecheckSTLC rep env fun

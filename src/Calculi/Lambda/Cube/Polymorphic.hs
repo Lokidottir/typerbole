@@ -37,6 +37,12 @@ data InferenceEnvironment v t = InferenceEnvironment
     Class of typesystems that exhibit polymorphism.
 -}
 class (SimpleType t) => Polymorphic t where
+
+    {-|
+        The representation of a poly type, also reffered to as a type variable.
+    -}
+    type PolyType t :: *
+
     {-|
         Generates a list of tuples representing the possible substitutions that
         can be made when the first type is substituting the second.
@@ -62,7 +68,7 @@ class (SimpleType t) => Polymorphic t where
 
         @`quantify` a (a → X) = (∀ a. a → X)@
     -}
-    quantify :: t -> t -> t
+    quantify :: PolyType t -> t -> t
 
     {-|
         Split a quantification into it's variable being quantified and
@@ -72,7 +78,7 @@ class (SimpleType t) => Polymorphic t where
 
         @`unquantify` (X → b) = Nothing@
     -}
-    unquantify :: t -> Maybe (t, t)
+    unquantify :: t -> Maybe (PolyType t, t)
 
     {-|
         Calculate if one type can substitute another, should check if there are any error in the
@@ -106,6 +112,11 @@ class (SimpleType t) => Polymorphic t where
         subs2 <- nubSort <$> substitutions y x -- get the sorted substitutions of the second
         return (subs1 == fmap swap subs2) -- swap the second's elements and check if equal
 
+    {-|
+        Polymorphic
+    -}
+    poly :: PolyType t -> t
+
 {-|
     Infix, flipped `canSubstitute` corresponding to the type ordering operator used in
     much of type theory.
@@ -126,7 +137,7 @@ infix 4 ≣
 {-|
     Infix `quantify`, looks a bit like @∀@ but doesn't interfere with unicode syntax extensions.
 -}
-(\-/) :: Polymorphic t => t -> t -> t
+(\-/) :: Polymorphic t => PolyType t -> t -> t
 (\-/) = quantify
 
 infixr 6 \-/

@@ -26,7 +26,7 @@ type SimplyTyped' = SimplyTyped Integer
 type SystemFOmega' = SystemFOmega Integer Integer
 type SystemF' = SF.SystemF Integer Integer
 
-followsSimpleType ::(SimpleType t) => Gen t -> Spec
+followsSimpleType :: (SimpleType t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $
     prop "follows abstract-reify inverse law" $ abstractInverse <$> gen <*> gen
 
@@ -40,9 +40,9 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
 
 followsHigherOrder :: (HigherOrder t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
-    prop "unkind is inverse of kind" $
+    prop "follows kind-unkind inverse law" $
         (\ty -> unkind (kind ty) == ty) <$> gen
-    prop "dissectType is inverse of applyType"
+    prop "follows typeap-untypeap inverse law" $ typeapInverse <$> gen <*> gen
 
 {-|
     An expression of type "(0 -> 5) -> 0 -> 5"
@@ -56,5 +56,8 @@ expr1 = Lambda (1, ST.Mono 0 /-> ST.Mono 5) (Lambda (2, ST.Mono 0) (Var 1 `Apply
 abstractInverse :: (SimpleType t) => t -> t -> Bool
 abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
 
-quantifyInverse :: Polymorphic t => t -> t -> Bool
+quantifyInverse :: Polymorphic t => (PolyType t) -> t -> Bool
 quantifyInverse !ta !tb = fmap (uncurry quantify) (unquantify (quantify ta tb)) == Just (quantify ta tb)
+
+typeapInverse :: HigherOrder t => t -> t -> Bool
+typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)

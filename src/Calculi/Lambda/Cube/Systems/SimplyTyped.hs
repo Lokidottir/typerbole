@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module Calculi.Lambda.Cube.Systems.SimplyTyped where
 
 import           Calculi.Lambda
@@ -29,6 +28,8 @@ instance Foldable SimplyTyped where
         Function t1 t2 -> foldr f (foldr f z t2) t1
 
 instance Ord t => SimpleType (SimplyTyped t) where
+    type MonoType (SimplyTyped t) = t
+
     abstract = Function
 
     reify (Function x y) = Just (x, y)
@@ -37,13 +38,8 @@ instance Ord t => SimpleType (SimplyTyped t) where
     bases (Mono t)         = Set.singleton (Mono t)
     bases (Function t1 t2) = bases t1 `Set.union` bases t2
 
+    mono = Mono
+
 instance (Data t, Arbitrary t) => Arbitrary (SimplyTyped t) where
     -- TODO: remove instance of Data for t
     arbitrary = sized generatorP
-
-data InferState v t = InferState {
-      subsMade  :: Map.Map v [t]
-    , typingEnv :: TypingEnvironment v t
-}
-
-type Infer v t = State.State (InferState v t)

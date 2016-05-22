@@ -17,7 +17,7 @@ data SystemF m p =
       Mono m
     | Poly p
     | Function (SystemF m p) (SystemF m p)
-    | Forall (SystemF m p) (SystemF m p)
+    | Forall p (SystemF m p)
     deriving (Eq, Ord, Show, Read, Data)
 
 deriveBifunctor ''SystemF
@@ -25,6 +25,9 @@ deriveBifoldable ''SystemF
 deriveBitraversable ''SystemF
 
 instance (Ord m, Ord p) => SimpleType (SystemF m p) where
+
+    type MonoType (SystemF m p) = m
+
     abstract = Function
 
     reify (Function a b) = Just (a, b)
@@ -32,10 +35,15 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     bases = \case
         Function fun arg -> bases fun <> bases arg
-        Forall p expr    -> Set.insert p (bases expr)
+        Forall p expr    -> Set.insert (Poly p) (bases expr)
         expr             -> Set.singleton expr
 
+    mono = Mono
+
 instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
+
+    type PolyType (SystemF m p) = p
+
     substitutions = curry $ \case
         (Forall _ expr, target) -> substitutions expr target
         (expr, target@Poly{})   -> Just [(expr, target)]
@@ -55,13 +63,15 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
                 | canSub && p == target  -> sub
                 | otherwise              -> p
             Forall p expr
-                | canSub &&  p == target -> applySubstitution' expr
+                | canSub && Poly p == target -> applySubstitution' expr
                 | otherwise              -> Forall p (applySubstitution' expr)
             Function fune arge           -> Function (applySubstitution' fune) (applySubstitution' arge)
 
     quantify = Forall
     unquantify (Forall a b) = Just (a, b)
     unquantify _ = Nothing
+
+    poly = Poly
 
 instance (Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
