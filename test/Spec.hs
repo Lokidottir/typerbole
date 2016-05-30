@@ -30,18 +30,18 @@ followsSimpleType :: (SimpleType t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $
     prop "follows abstract-reify inverse law" $ abstractInverse <$> gen <*> gen
 
-followsPolymorphic :: (Polymorphic t, Show t, Arbitrary t) => Gen t -> Spec
+followsPolymorphic :: (Polymorphic t, Show t, Arbitrary t, PolyType t ~ Integer) => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "equivalence is reflexive" $
         (\ !ty -> ty ≣ ty) <$> gen
     prop "substitution is reflexive" $
         (\ !ty -> ty `canSubstitute` ty) <$> gen
-    prop "follows quantify-unquantify inverse law" $ quantifyInverse <$> gen <*> gen
+    prop "follows quantify-unquantify inverse law" $ quantifyInverse <$> arbitrary <*> gen
 
 followsHigherOrder :: (HigherOrder t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
     prop "follows kind-unkind inverse law" $
-        (\ty -> unkind (kind ty) == ty) <$> gen
+        (\ty -> unkind (kind ty) == Just ty) <$> gen
     prop "follows typeap-untypeap inverse law" $ typeapInverse <$> gen <*> gen
 
 {-|
@@ -56,7 +56,7 @@ expr1 = Lambda (1, ST.Mono 0 /-> ST.Mono 5) (Lambda (2, ST.Mono 0) (Var 1 `Apply
 abstractInverse :: (SimpleType t) => t -> t -> Bool
 abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
 
-quantifyInverse :: Polymorphic t => (PolyType t) -> t -> Bool
+quantifyInverse :: (Polymorphic t, PolyType t ~ Integer) => Integer -> t -> Bool
 quantifyInverse !ta !tb = fmap (uncurry quantify) (unquantify (quantify ta tb)) == Just (quantify ta tb)
 
 typeapInverse :: HigherOrder t => t -> t -> Bool

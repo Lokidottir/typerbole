@@ -2,15 +2,20 @@
 module Calculi.Lambda.Cube.Polymorphic where
 
 import           Calculi.Lambda.Cube.SimpleType
+import           Control.Monad
+import           Control.Monad.State.Class
 import           Data.Either
+import           Data.Function hiding ((&))
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
 import           Data.List.Ordered
+import           Data.List (groupBy)
 import qualified Data.Map                       as Map
 import           Data.Maybe
 import qualified Data.Set                       as Set
 import           Data.Tuple
 import           Debug.Trace
+import           Data.Tree
 
 {-|
     A type alias for substitutions, which are just endomorphisms.
@@ -55,7 +60,7 @@ class (SimpleType t) => Polymorphic t where
 
         @`substitutions` (∀ a. a -> a) (∀ b. b) = Just [(a -> a, b)]@
     -}
-    substitutions :: t -> t -> Maybe [(t, t)]
+    substitutions :: t -> t -> Maybe [(t, t)] -- TODO: do the work to let this be Maybe [(t, PolyType t)]
 
     {-|
         Substitution application, given one type substituting another, generate a function
@@ -95,7 +100,7 @@ class (SimpleType t) => Polymorphic t where
         -- but it this is still valid as far as type theory (and ghci) is concerned
         fromMaybe False (isRight . subsToGraph <$> substitutions x y) || x == y
 
-    {-
+    {-|
         Check if two types are equivalent, where equivalence is defined as the substitutions
         being made being symbolically identical, where binds and type variables appear in
         the same place but may have different names.
@@ -113,7 +118,8 @@ class (SimpleType t) => Polymorphic t where
         return (subs1 == fmap swap subs2) -- swap the second's elements and check if equal
 
     {-|
-        Polymorphic
+        Polymorphic constructor synonym, as many implementations will have a constructor along
+        the lines of "Poly p".
     -}
     poly :: PolyType t -> t
 
@@ -226,3 +232,95 @@ subsToGraph subsPairs
                             -}
                             rootsFromPaths :: Ord a => [[a]] -> Set.Set a
                             rootsFromPaths = foldl (\st path -> Set.insert (head path) st) Set.empty
+
+data SubsErr' t p =
+      CyclicSubstitution' [(t, t, p)]
+    | MultipleSubstitutions' p [[(t, t, p)]]
+
+subsToGraph'
+    :: forall t p gr. (Polymorphic t, p ~ PolyType t, Ord p, DynGraph gr)
+    => [(t, p)]
+    -> Either [SubsErr' t p] (gr t p)
+subsToGraph' subs =
+    let (errs, (_, graph :: gr t p)) = run empty (subsToGraphM subs)
+    in if null errs then Right graph else Left errs
+
+{-|
+    A version of `subsToGraph` that works within fgl's NodeMap state monad.
+-}
+subsToGraphM
+    :: forall t p gr. -- No haddock documentation for constraints, so documentation is in source
+    ( Polymorphic t   -- The typesystem @t@ is a an instance of Polymorphic
+    , p ~ PolyType t  -- @p@ is @t@'s representation of type variables
+    , Ord p           -- t's representation of type variables is ordered
+    , DynGraph gr     -- the graph representation is an instance of DynGraph
+    )
+    => [(t, p)]       -- ^ A list of substitutions
+    -> NodeMapM t p gr [SubsErr' t p]
+                      -- ^ A nodemap monadic action where the graph's edges are substitutions
+                      -- and the nodes are types where substitutions should be
+subsToGraphM subs = do
+    {-
+        Construct the graph so we have something to work with.
+    -}
+    -- Assemble a list of all the type expressions, including the substitution targets
+    {- Note: to make this work from a point of theory, all the targets in "subs" are turned into
+       type expressions using the polymorphic constructor, allowing all substitutions to
+       have at least one edge from the substitutions to the targets. -}
+    let typeExprs = nubSort $ concat ((\(t, p) -> [t, poly p]) <$> subs)
+    -- Build a list of type expressions and their bases.
+    let basesList = (\t -> (t, bases t)) <$> typeExprs
+    -- Construct the edges
+    let subsEdges = buildEdge <$> subs <*> basesList
+    -- Insert the edges.
+    insMapEdgesM (catMaybes subsEdges)
+    -- Compute and return the errors
+    validateAsSubsgraph <$> gets snd where
+        {-
+            Given a substitution pair and pair of a type expression and it's
+            base types, check if the substitution's own target appears in those
+            base types.
+        -}
+        buildEdge :: (t, p) -> (t, Set.Set t) -> Maybe (t, t, p)
+        buildEdge (t1, p) (t2, t2'bases)
+            | poly p `Set.member` t2'bases = Just (t1, t2, p)
+            | otherwise = Nothing
+
+        validateAsSubsgraph :: gr t p -> [SubsErr' t p]
+        validateAsSubsgraph graph =
+            let cycles = fromMaybe [] (cyclesOfGraphMay graph)
+                clashes :: [(p, [[(t, t, p)]])]
+                clashes = undefined
+            in if not (null cycles) then
+                -- If ther are cycles, return them after passing them through the error constructor.
+                CyclicSubstitution' <$> cycles
+                else if not (null clashes) then
+                    uncurry MultipleSubstitutions' <$> clashes
+                    else []
+
+        clashesOfGraph :: gr t p -> [(p, Node, [(t, t, p)])]
+        clashesOfGraph graph = undefined where
+
+            {-|
+                List of contexts that fit `selector`'s predicate.
+            -}
+            candidates = gsel selector graph
+
+            {-|
+                Evaluate to true on any node with inward edges that do not have completely
+                unique labels, as this means there's two or more substitutions being attempted
+                on the same type variable.
+            -}
+            selector (inward, _, _, _) = any hasSome $ groupByEdgelabel inward
+
+            {-|
+                Group by equality on the first element (edge label).
+            -}
+            groupByEdgelabel :: Eq a => [(a, b)] -> [[(a, b)]]
+            groupByEdgelabel = groupBy (on (==) fst)
+
+        {-|
+            DFS algorithm for finding the paths of substitution clashes.
+        -}
+        clashPaths :: gr t p -> [Node] -> Tree (LEdge p)
+        clashPaths graph nodes = undefined

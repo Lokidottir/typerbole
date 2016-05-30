@@ -19,19 +19,23 @@ data Star =
     Simply-typed lambda calculus at the type level, describing the
     kindedness of a type expression and used to typecheck/infer
 -}
-type Kindedness t = LambdaExpr t (SimplyTyped Star)
+type Kindedness t = LambdaExpr t (SimplyTyped (Kind t))
 
 {-|
     Typeclass for higher-order types.
 -}
 class SimpleType t => HigherOrder t where
+    {-|
+        The representation of kind constants.
+    -}
+    type Kind t :: *
 
     {-|
         Construct a kind expression describing the application and abstraction of
         types in a given type. Not given a kind enviroment as given a kindedness
         expression, this information can be derived generally.
 
-        @`kind` (∀ a. a) = Let [(a, Var a `star`)] (Var a)@
+        @`kind` (∀ a. a) = (Lambda (a, star) a)@
 
         If inference elsewhere found out that @(∀ a. a)@'s kind wasn't @*@ and instead
         @* → *@ then it could rewrite this expression to match. What matters is that
@@ -71,8 +75,6 @@ class SimpleType t => HigherOrder t where
         Apply a b -> (,) <$> unkind a <*> unkind b
         _         -> Nothing
 
-    {-# MINIMAL kind, unkind #-}
-
 {-|
     Infix `typeap`.
 -}
@@ -81,7 +83,7 @@ class SimpleType t => HigherOrder t where
 infixl 8 /$
 
 {-|
-    Shorthand for @`SimplyTyped.Mono` `Star`@ which can look messy in implementations.
+    Shorthand for the constant `Star` in typesystems.
 -}
-star :: SimplyTyped Star
-star = SimplyTyped.Mono Star
+star :: (SimpleType t, MonoType t ~ Star) => t
+star = mono Star

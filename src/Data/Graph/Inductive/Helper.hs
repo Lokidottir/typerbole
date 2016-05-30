@@ -6,6 +6,7 @@ import qualified Data.Map             as Map
 import           Data.Maybe
 import qualified Data.Set             as Set
 import           Data.Tuple
+import qualified Data.Tree            as Tree
 
 {-|
     Given a list of pairs of an orderable type, will build a graph representing
@@ -43,11 +44,24 @@ cyclesOfGraph graph = fromMaybe []   -- give a default to bring this out of the 
                     . filter hasSome -- filter out any with only 1 element
                     . scc $ graph    -- get the strongly connected components
 
+cyclesOfGraphMay :: (Graph gr, Ord n, Ord e) => gr n e -> Maybe [[(n, n, e)]]
+cyclesOfGraphMay graph = do
+    -- Get a list of all cycles, replacing the node number with the node's context.
+    let cyclesInitial = fmap (\(_,nn,_,_) -> nn) <$> filter hasSome' (fmap (context graph) <$> scc graph)
+    let cycles = undefined
+    undefined
+
 -- | Returns true if a list has more than 1 element
 hasSome :: [a] -> Bool
 hasSome []  = False
 hasSome [_] = False
 hasSome _   = True
+
+-- | Returns true if a list of contexts has more than one element or a loop in it's only element.
+hasSome' :: [Context n l] -> Bool
+hasSome' [] = False
+hasSome' [(_, noden, _, outward)] = any ((== noden) . snd) outward
+hasSome' _ = True
 
 {-|
     Build a graph with no edges from a foldable container of node values.
@@ -79,3 +93,7 @@ topsortWithCycles graph =
             Nothing -> Right h : sieveCycles tl
             Just cy -> Left (Set.toList cy) : sieveCycles (filter (`Set.notMember` cy) tl)
     in sieveCycles tsorted
+
+treeToPaths :: Tree.Tree a -> [[a]]
+treeToPaths (Tree.Node l []) = [[l]]
+treeToPaths (Tree.Node l sbf) = (l :) <$> concat (treeToPaths <$> sbf)

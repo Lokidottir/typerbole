@@ -6,6 +6,7 @@ import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Inferable
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
+import           Calculi.Lambda.Cube.Systems.SimplyTyped (SimplyTyped)
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bifunctor.TH
@@ -91,6 +92,9 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
     poly = Poly
 
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
+
+    type Kind (SystemFOmega m p) = Star
+
     kind = \case
         m@Mono{}      -> Var m
         -- The function arrow (→ in the psudocode) is a mono type of the kind (* -> * -> *)
