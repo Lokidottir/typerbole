@@ -35,6 +35,18 @@ findRootPathsBy f graph ctx = (f ctx, findRootPathsRec [] ctx) where
         [] -> [f ctx' : path]
         a  -> concatMap (findRootPathsRec (f ctx' : path) . context graph . snd) a
 
+treeRootStatefulBy
+    :: Graph gr
+    => (st -> Graph.Context n e -> (a, st)) -- ^ The stateful fold function
+    -> st                                   -- ^ The initial state
+    -> gr n e                               -- ^ The graph to traverse
+    -> Graph.Context n e                    -- ^ The initial context
+    -> Tree.Tree (a, st)                    -- ^ The resulting tree of values and states at each node.
+treeRootStatefulBy f st graph = trsbRec st where
+    trsbRec st' ctx'@(inward, _, _, _) =
+        let val = f st' ctx'
+        in Tree.Node val (trsbRec (snd val) . context graph . snd <$> inward)
+
 cyclesOfGraph :: Graph gr => gr n l -> [[LNode n]]
 cyclesOfGraph graph = fromMaybe []   -- give a default to bring this out of the Maybe
                     . sequence       -- sequence again from [Maybe [...]] to Maybe [[...]]
@@ -94,6 +106,9 @@ topsortWithCycles graph =
             Just cy -> Left (Set.toList cy) : sieveCycles (filter (`Set.notMember` cy) tl)
     in sieveCycles tsorted
 
+{-|
+    Convert a tree into a list of all of it's paths.
+-}
 treeToPaths :: Tree.Tree a -> [[a]]
 treeToPaths (Tree.Node l []) = [[l]]
 treeToPaths (Tree.Node l sbf) = (l :) <$> concat (treeToPaths <$> sbf)

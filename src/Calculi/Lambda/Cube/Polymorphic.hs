@@ -6,7 +6,7 @@ import           Control.Monad
 import           Control.Monad.State.Class
 import           Data.Either
 import           Data.Function hiding ((&))
-import           Data.Graph.Inductive
+import           Data.Graph.Inductive as Graph
 import           Data.Graph.Inductive.Helper
 import           Data.List.Ordered
 import           Data.List (groupBy)
@@ -16,6 +16,8 @@ import qualified Data.Set                       as Set
 import           Data.Tuple
 import           Debug.Trace
 import           Data.Tree
+import           Control.Lens as Lens hiding ((&))
+import qualified Control.Lens as Lens ((&))
 
 {-|
     A type alias for substitutions, which are just endomorphisms.
@@ -235,7 +237,8 @@ subsToGraph subsPairs
 
 data SubsErr' t p =
       CyclicSubstitution' [(t, t, p)]
-    | MultipleSubstitutions' p [[(t, t, p)]]
+    | MultipleSubstitutions' (ClashTreeRoot t p)
+    deriving (Eq, Show, Read)
 
 subsToGraph'
     :: forall t p gr. (Polymorphic t, p ~ PolyType t, Ord p, DynGraph gr)
@@ -289,17 +292,20 @@ subsToGraphM subs = do
         validateAsSubsgraph :: gr t p -> [SubsErr' t p]
         validateAsSubsgraph graph =
             let cycles = fromMaybe [] (cyclesOfGraphMay graph)
-                clashes :: [(p, [[(t, t, p)]])]
-                clashes = undefined
+                clashes :: [ClashTreeRoot t p]
+                clashes = clashesOfGraph graph
             in if not (null cycles) then
                 -- If ther are cycles, return them after passing them through the error constructor.
                 CyclicSubstitution' <$> cycles
                 else if not (null clashes) then
-                    uncurry MultipleSubstitutions' <$> clashes
+                    MultipleSubstitutions' <$> clashes
                     else []
 
-        clashesOfGraph :: gr t p -> [(p, Node, [(t, t, p)])]
-        clashesOfGraph graph = undefined where
+        {-|
+            Generate a list of trees of fully labelled edges,
+        -}
+        clashesOfGraph :: gr t p -> [ClashTreeRoot t p]
+        clashesOfGraph graph = concatMap findClashRootPaths candidates where
 
             {-|
                 List of contexts that fit `selector`'s predicate.
@@ -314,13 +320,58 @@ subsToGraphM subs = do
             selector (inward, _, _, _) = any hasSome $ groupByEdgelabel inward
 
             {-|
-                Group by equality on the first element (edge label).
+                Get the clash root paths for an individual context. These get
+                concatinated to a list for all the contexts.
             -}
-            groupByEdgelabel :: Eq a => [(a, b)] -> [[(a, b)]]
-            groupByEdgelabel = groupBy (on (==) fst)
+            findClashRootPaths :: Graph.Context t p -> [ClashTreeRoot t p]
+            findClashRootPaths ctx = buildClashRootPaths <$> ctxGroups where
+                {-|
+                    Contexts grouped by their edge labels towards ctx, all groups with <2 elements
+                    have been filtered out due clashes being defined as there being two or more inward
+                    edges with the same label.
+                -}
+                ctxGroups =
+                    fmap (context graph . (^._2)) <$> filter hasSome (groupByEdgelabel (ctx^._1))
+
+                {-|
+                    Build the clash root path for an individual group.
+                -}
+                buildClashRootPaths :: [Graph.Context t p] -> ClashTreeRoot t p
+                buildClashRootPaths ctxs = undefined where
+                    {-|
+                        The original context but with it's inward edges that aren't in
+                        the provided group removed.
+                    -}
+                    ctx' :: Graph.Context t p
+                    ctx' = ctx Lens.& _1 %~ filter ((`Set.member` ctxs') . snd)
+
+                    {-|
+                        Set of all inward nodes of the group.
+                    -}
+                    ctxs' = Set.fromList $ node' <$> ctxs
+
+                    {-|
+                        Function that given a previous context and a current context,
+                        builds a tuple of the edge current context's label and the labels of
+                        all edges from the current context to the previous context.
+                    -}
+                    statef :: Graph.Context t p -> Graph.Context t p -> ((t, [p]), Graph.Context)
+                    statef ctxPre ctxCurr = undefined
 
         {-|
-            DFS algorithm for finding the paths of substitution clashes.
+            Group by equality on the first element (edge label) and inequality on the second.
         -}
-        clashPaths :: gr t p -> [Node] -> Tree (LEdge p)
-        clashPaths graph nodes = undefined
+        groupByEdgelabel :: (Eq a, Eq b) => [(a, b)] -> [[(a, b)]]
+        groupByEdgelabel = groupBy (\(a, b) (a', b') -> a == a' && b /= b')
+
+{-|
+    A substitution clash's root, with a tree of types substituting
+    variables as the first element [1] and the second element being the
+    type where these clashing substitutions converge.
+
+    [1]: to be read that the first element of the tuple is a forest of
+    substitutions leading the final type (the second element), and
+    because of their convergence the first layer of the trees should
+    all be substituting the same variable.
+-}
+type ClashTreeRoot t p = ([Tree (t, p)], t)
