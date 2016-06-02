@@ -195,6 +195,8 @@ subsToGraphM subs = do
     let basesList = (\t -> (t, bases t)) <$> typeExprs
     -- Construct the edges
     let subsEdges = buildEdge <$> subs <*> basesList
+    -- Insert the nodes. (crashes if this isn't done first, because fgl!)
+    void (insMapNodesM typeExprs)
     -- Insert the edges.
     insMapEdgesM (catMaybes subsEdges)
     -- Compute and return the errors
