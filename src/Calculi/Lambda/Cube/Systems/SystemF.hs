@@ -46,7 +46,7 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 
     substitutions = curry $ \case
         (Forall _ expr, target) -> substitutions expr target
-        (expr, target@Poly{})   -> Just [(expr, target)]
+        (expr, Poly p)   -> Just [(expr, p)]
         (expr, Forall _ target) -> substitutions expr target
         (Function fune arge, Function funt argt)
                                 -> (<>) <$> substitutions fune funt <*> substitutions arge argt
@@ -55,15 +55,13 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
             | otherwise      -> Nothing
 
     applySubstitution sub target = applySubstitution' where
-        canSub = sub `canSubstitute` target
-
         applySubstitution' = \case
             m@Mono{}                     -> m
-            p@Poly{}
-                | canSub && p == target  -> sub
-                | otherwise              -> p
+            p'@(Poly p)
+                | p == target  -> sub
+                | otherwise              -> p'
             Forall p expr
-                | canSub && Poly p == target -> applySubstitution' expr
+                | p == target -> applySubstitution' expr
                 | otherwise              -> Forall p (applySubstitution' expr)
             Function fune arge           -> Function (applySubstitution' fune) (applySubstitution' arge)
 

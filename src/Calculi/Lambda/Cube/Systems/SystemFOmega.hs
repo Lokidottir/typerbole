@@ -6,15 +6,12 @@ import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Inferable
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
-import           Calculi.Lambda.Cube.Systems.SimplyTyped (SimplyTyped)
 import           Data.Bifoldable
-import           Data.Bifunctor
 import           Data.Bifunctor.TH
 import           Data.Generics
 import           Data.Random.Generics
 import           Data.Semigroup
 import qualified Data.Set                        as Set
-import qualified Data.Map                        as Map
 import           Test.QuickCheck
 
 {-|
@@ -62,28 +59,26 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
         (Forall _ expr, target) -> substitutions expr target
         -- Only poly types can actually be substituted, so if a poly type is
         -- on the right hand side then the left hand side is it's substitution
-        (expr, target@Poly{})    -> Just [(expr, target)]
+        (expr, Poly p)          -> Just [(expr, p)]
         -- Foralls require recursing on it's type expr
         (expr, Forall _ target) -> substitutions expr target
         (TypeAp tl1 tr1, TypeAp tl2 tr2)
-                         -> (<>) <$> substitutions tl1 tl2 <*> substitutions tr1 tr2
+                                -> (<>) <$> substitutions tl1 tl2 <*> substitutions tr1 tr2
         (expr, target)
             | expr == target -> Just []
             | otherwise -> Nothing
 
     applySubstitution sub target = applySubstitution' where
-        canSub = sub `canSubstitute` target
-        -- Might have a case of premature best-practices
         applySubstitution' = \case
-            m@Mono{}                         -> m
-            FunctionArrow                    -> FunctionArrow
-            p@Poly{}
-                | canSub && p == target -> sub
-                | otherwise                  -> p
+            m@Mono{}          -> m
+            FunctionArrow     -> FunctionArrow
+            p'@(Poly p)
+                | p == target -> sub
+                | otherwise   -> p'
             Forall p sf
-                | canSub && Poly p == target -> applySubstitution' sf
-                | otherwise                  -> Forall p (applySubstitution' sf)
-            TypeAp tl tr                     -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
+                | p == target -> applySubstitution' sf
+                | otherwise   -> Forall p (applySubstitution' sf)
+            TypeAp tl tr      -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
 
     quantify = Forall
     unquantify (Forall a b) = Just (a, b)
