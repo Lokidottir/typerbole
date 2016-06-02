@@ -235,15 +235,15 @@ subsToGraph subsPairs
                             rootsFromPaths :: Ord a => [[a]] -> Set.Set a
                             rootsFromPaths = foldl (\st path -> Set.insert (head path) st) Set.empty
 
-data SubsErr' t p =
-      CyclicSubstitution' [(t, t, p)]
+data SubsErr' gr t p =
+      CyclicSubstitution' (gr t p)
     | MultipleSubstitutions' (ClashTreeRoot t p)
     deriving (Eq, Show, Read)
 
 subsToGraph'
     :: forall t p gr. (Polymorphic t, p ~ PolyType t, Ord p, DynGraph gr)
     => [(t, p)]
-    -> Either [SubsErr' t p] (gr t p)
+    -> Either [SubsErr' gr t p] (gr t p)
 subsToGraph' subs =
     let (errs, (_, graph :: gr t p)) = run empty (subsToGraphM subs)
     in if null errs then Right graph else Left errs
@@ -252,14 +252,14 @@ subsToGraph' subs =
     A version of `subsToGraph` that works within fgl's NodeMap state monad.
 -}
 subsToGraphM
-    :: forall t p gr. -- No haddock documentation for constraints, so documentation is in source
+    :: forall t p gr. -- No haddock documentation for constraints, but putting this here anyway
     ( Polymorphic t   -- The typesystem @t@ is a an instance of Polymorphic
     , p ~ PolyType t  -- @p@ is @t@'s representation of type variables
     , Ord p           -- t's representation of type variables is ordered
     , DynGraph gr     -- the graph representation is an instance of DynGraph
     )
     => [(t, p)]       -- ^ A list of substitutions
-    -> NodeMapM t p gr [SubsErr' t p]
+    -> NodeMapM t p gr [SubsErr' gr t p]
                       -- ^ A nodemap monadic action where the graph's edges are substitutions
                       -- and the nodes are types where substitutions should be
 subsToGraphM subs = do
@@ -289,10 +289,9 @@ subsToGraphM subs = do
             | poly p `Set.member` t2'bases = Just (t1, t2, p)
             | otherwise = Nothing
 
-        validateAsSubsgraph :: gr t p -> [SubsErr' t p]
+        validateAsSubsgraph :: gr t p -> [SubsErr' gr t p]
         validateAsSubsgraph graph =
-            let cycles = fromMaybe [] (cyclesOfGraphMay graph)
-                clashes :: [ClashTreeRoot t p]
+            let cycles = cyclicSubgraphs graph
                 clashes = clashesOfGraph graph
             in if not (null cycles) then
                 -- If ther are cycles, return them after passing them through the error constructor.
@@ -337,26 +336,34 @@ subsToGraphM subs = do
                     Build the clash root path for an individual group.
                 -}
                 buildClashRootPaths :: [Graph.Context t p] -> ClashTreeRoot t p
-                buildClashRootPaths ctxs = undefined where
+                buildClashRootPaths ctxs = (paths, lab' ctx) where
                     {-|
                         The original context but with it's inward edges that aren't in
                         the provided group removed.
                     -}
                     ctx' :: Graph.Context t p
-                    ctx' = ctx Lens.& _1 %~ filter ((`Set.member` ctxs') . snd)
+                    ctx' = ctx Lens.& _1 %~ filter ((`Set.member` ctxsNodeSet) . snd)
 
                     {-|
-                        Set of all inward nodes of the group.
+                        Set of all nodes labels of the group.
                     -}
-                    ctxs' = Set.fromList $ node' <$> ctxs
+                    ctxsNodeSet = Set.fromList $ node' <$> ctxs
 
                     {-|
-                        Function that given a previous context and a current context,
-                        builds a tuple of the edge current context's label and the labels of
-                        all edges from the current context to the previous context.
+                        All the paths leading to the final context.
                     -}
-                    statef :: Graph.Context t p -> Graph.Context t p -> ((t, [p]), Graph.Context)
-                    statef ctxPre ctxCurr = undefined
+                    paths :: [Tree (t, [p])]
+                    paths = fmap fst <$> (treeRootStatefulBy statef ctx' graph <$> ctxs) where
+                        {-|
+                            Function that given a previous context and a current context,
+                            builds a tuple of the current context's label and the labels of
+                            all edges from the current context to the previous context.
+                        -}
+                        statef :: Graph.Context t p -> Graph.Context t p -> ((t, [p]), Graph.Context t p)
+                        statef ctxPre ctxCurr = ((lab' ctxCurr, subbed), ctxCurr) where
+                            -- The list of all type variables in the previous context substituted
+                            -- by the label of the current context
+                            subbed = fst <$> filter ((== node' ctxPre) . snd) (ctxCurr^._4)
 
         {-|
             Group by equality on the first element (edge label) and inequality on the second.
@@ -374,4 +381,4 @@ subsToGraphM subs = do
     because of their convergence the first layer of the trees should
     all be substituting the same variable.
 -}
-type ClashTreeRoot t p = ([Tree (t, p)], t)
+type ClashTreeRoot t p = ([Tree (t, [p])], t)

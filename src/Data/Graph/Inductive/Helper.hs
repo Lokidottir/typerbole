@@ -7,6 +7,7 @@ import           Data.Maybe
 import qualified Data.Set             as Set
 import           Data.Tuple
 import qualified Data.Tree            as Tree
+import qualified Data.List.NonEmpty   as NE
 
 {-|
     Given a list of pairs of an orderable type, will build a graph representing
@@ -56,12 +57,11 @@ cyclesOfGraph graph = fromMaybe []   -- give a default to bring this out of the 
                     . filter hasSome -- filter out any with only 1 element
                     . scc $ graph    -- get the strongly connected components
 
-cyclesOfGraphMay :: (Graph gr, Ord n, Ord e) => gr n e -> Maybe [[(n, n, e)]]
-cyclesOfGraphMay graph = do
-    -- Get a list of all cycles, replacing the node number with the node's context.
-    let cyclesInitial = fmap (\(_,nn,_,_) -> nn) <$> filter hasSome' (fmap (context graph) <$> scc graph)
-    let cycles = undefined
-    undefined
+{-|
+    Given a graph, generate a possibly empty list of subgraphs that are the it's cycles.
+-}
+cyclicSubgraphs :: forall gr n e. (DynGraph gr, Ord n, Ord e) => gr n e -> [gr n e]
+cyclicSubgraphs graph = flip subgraph graph <$> scc graph
 
 -- | Returns true if a list has more than 1 element
 hasSome :: [a] -> Bool
