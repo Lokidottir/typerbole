@@ -74,6 +74,12 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     {-|
         Substitution application, given one type substituting a type variable,
         generate a function that will apply the substitution in a type expression.
+
+        @`applySubstitution` X a (∀ a b. a → b → a) = (∀ b. X → b → X)@
+
+        @`applySubstitution` Y x (M x) = (M Y)@
+
+        @`applySubstitution` Y x (M Q) = (M Q)@
     -}
     applySubstitution :: t -> PolyType t -> Substitution t
 
@@ -125,9 +131,9 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     areEquivalent :: t -> t -> Bool
     areEquivalent x y = fromMaybe (x == y) $ do
         subs1 <- nubSort . mapPoly <$> substitutions x y -- get the sorted substitutions of the first
-        subs2 <- nubSort . mapPoly <$> substitutions y x -- get the sorted substitutions of the second
-        return (subs1 == fmap swap subs2) where
-            mapPoly = fmap (fmap (poly :: PolyType t -> t))
+        subs2 <- nubSort . fmap swap . mapPoly <$> substitutions y x -- get the sorted substitutions of the second
+        return (subs1 == subs2) where
+            mapPoly = fmap (_2 %~ (poly :: PolyType t -> t))
 
     {-|
         Polymorphic constructor synonym, as many implementations will have a constructor along
@@ -211,6 +217,10 @@ subsToGraphM subs = do
             | poly p `Set.member` t2'bases = Just (t1, t2, p)
             | otherwise = Nothing
 
+        {-
+            Generate a possibly empty list of substitution errors in the graph that was
+            built.
+        -}
         validateAsSubsgraph :: gr t p -> [SubsErr gr t p]
         validateAsSubsgraph graph =
             let cycles = cyclicSubgraphs graph

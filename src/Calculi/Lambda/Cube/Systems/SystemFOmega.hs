@@ -6,6 +6,7 @@ import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Inferable
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
+import qualified Language.Haskell.TH.Lift as TH
 import           Data.Bifoldable
 import           Data.Bifunctor.TH
 import           Data.Generics
@@ -33,6 +34,7 @@ data SystemFOmega m p =
 deriveBifunctor ''SystemFOmega
 deriveBifoldable ''SystemFOmega
 deriveBitraversable ''SystemFOmega
+TH.deriveLift ''SystemFOmega
 
 instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
     type MonoType (SystemFOmega m p) = m

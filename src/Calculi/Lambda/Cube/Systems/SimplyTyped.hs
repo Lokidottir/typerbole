@@ -8,6 +8,7 @@ import qualified Data.Map                       as Map
 import           Data.Random.Generics
 import qualified Data.Set                       as Set
 import           Test.QuickCheck
+import qualified Language.Haskell.TH.Lift as TH
 
 {-|
     Data type describing a type system for simply-typed lambda calculus (λ→).
@@ -16,6 +17,8 @@ data SimplyTyped t =
       Mono t
     | Function (SimplyTyped t) (SimplyTyped t)
     deriving (Show, Read, Eq, Ord, Data)
+
+TH.deriveLift ''SimplyTyped
 
 instance Functor SimplyTyped where
     fmap f = \case

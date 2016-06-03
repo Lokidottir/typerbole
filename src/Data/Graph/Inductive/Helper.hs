@@ -112,3 +112,9 @@ topsortWithCycles graph =
 treeToPaths :: Tree.Tree a -> [[a]]
 treeToPaths (Tree.Node l []) = [[l]]
 treeToPaths (Tree.Node l sbf) = (l :) <$> concat (treeToPaths <$> sbf)
+
+{-|
+    Topsort inclusive of edges, assuming there are no cycles or multiple clashing substitutions.
+-}
+edgeyTopsort :: Graph gr => gr n e -> Maybe ([Tree.Tree (n, e)], n)
+edgeyTopsort graph = undefined

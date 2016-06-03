@@ -8,6 +8,7 @@ import           Data.Random.Generics
 import           Data.Generics
 import           Data.Monoid
 import           Test.QuickCheck
+import qualified Language.Haskell.TH.Lift as TH
 
 {-|
     An implementation of System-F, similar to haskell's own typesystems but without
@@ -23,6 +24,7 @@ data SystemF m p =
 deriveBifunctor ''SystemF
 deriveBifoldable ''SystemF
 deriveBitraversable ''SystemF
+TH.deriveLift ''SystemF
 
 instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
