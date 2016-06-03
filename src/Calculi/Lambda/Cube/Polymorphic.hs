@@ -141,6 +141,18 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     -}
     poly :: PolyType t -> t
 
+    {-|
+        Function retrives all the free type variables (hence "ftvs") in a type.
+        If the type is itself an unbound poly type, then that is returned.
+
+        @`ftvs` (∀ a. (∀ b. a → b → c d)) = `Set.fromList` [c, d]@
+
+        @`ftvs` (a → b → c) = `Set.fromList` [a, b, c]@
+
+        @`ftvs` (∀ c. X → c) = `Set.empty`@
+    -}
+    ftvs :: t -> Set.Set t
+
 {-|
     Infix, flipped `canSubstitute` corresponding to the type ordering operator used in
     much of type theory.

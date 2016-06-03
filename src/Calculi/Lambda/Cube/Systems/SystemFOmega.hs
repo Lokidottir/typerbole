@@ -88,6 +88,12 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
 
     poly = Poly
 
+    ftvs = \case
+        p@(Poly _)    -> Set.singleton p
+        Forall p sf   -> Set.delete (Poly p) (ftvs sf)
+        TypeAp tl tr  -> ftvs tl <> ftvs tr
+        _             -> Set.empty
+
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
 
     type Kind (SystemFOmega m p) = Star
@@ -113,18 +119,6 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
     typeap = TypeAp
     untypeap (TypeAp a b) = Just (a, b)
     untypeap _ = Nothing
-
-
-instance (Ord m, Ord p, Enum p) => HMInferable (SystemFOmega m p) where
-    ftvs = \case
-        p@(Poly _)    -> Set.singleton p
-        Forall p sf   -> Set.delete (Poly p) (ftvs sf)
-        TypeAp tl tr  -> ftvs tl `Set.union` ftvs tr
-        _             -> Set.empty
-
-    nptTape env = Poly <$> [succ maxP ..] where
-        -- Find the largest poly element in the type expression
-        maxP = maximum (bifoldr (flip const) max (toEnum 0) <$> vars env)
 
 instance (Data m, Data p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m p) where
     -- TODO: remove instances of Data for m and p

@@ -11,22 +11,3 @@ import           Calculi.Lambda.Cube.SimpleType
 import qualified Control.Monad.State.Lazy        as State
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
-
-class (Polymorphic t, HigherOrder t) => HMInferable t where
-    {-|
-        Function retrives all the free type variables (hence "ftvs") in a type.
-        If the type is itself an unbound poly type, then that is returned.
-
-        @`ftvs` (∀ a. (∀ b. a → b → c d)) = `Set.fromList` [c, d]@
-
-        @`ftvs` (a → b → c) = `Set.fromList` [a, b, c]@
-
-        @`ftvs` (∀ c. X → c) = `Set.empty`@
-    -}
-    ftvs :: t -> Set.Set t
-
-    {-|
-        Given a typing environment, generate an infinite list of unique poly types
-        that do not exist within the given environment.
-    -}
-    nptTape :: TypingEnvironment v t -> [t]
