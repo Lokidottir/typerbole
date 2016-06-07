@@ -8,24 +8,7 @@ import qualified Data.Set             as Set
 import           Data.Tuple
 import qualified Data.Tree            as Tree
 import qualified Data.List.NonEmpty   as NE
-
-{-|
-    Given a list of pairs of an orderable type, will build a graph representing
-    the nodes and their edges, and a map to get the the fgl node representation
-    of an element for any present node label.
--}
-edgesToGraph :: (Ord a, Graph gr) => [(a, a)] -> (gr a (), Map.Map a Node)
-edgesToGraph es = (mkGraph (swap <$> labeledNodes) (lookupEdge <$> es), nodeMap) where
-    -- Function looking up node label pairs to node numbers.
-    lookupEdge e = let luEdge = fromJust . (`Map.lookup` nodeMap)
-                   in (luEdge (fst e), luEdge (snd e), ())
-    -- Map of node labels to node numbers
-    nodeMap = Map.fromList labeledNodes
-    -- ordered list of labeled nodes and node numbers
-    labeledNodes = flip zip [0 :: Node, 1..]
-                 . Ord.nub
-                 . Ord.sort
-                 . concatMap (\(a,b) -> [a,b]) $ es
+import           Control.Lens hiding ((&))
 
 findRootPaths :: Graph gr => gr n e -> Graph.Context n e -> (Node, [[Node]])
 findRootPaths = findRootPathsBy (\(_, node, _, _) -> node)
@@ -70,7 +53,7 @@ hasSome [_] = False
 hasSome _   = True
 
 -- | Returns true if a list of contexts has more than one element or a loop in it's only element.
-hasSome' :: [Context n l] -> Bool
+hasSome' :: [Graph.Context n l] -> Bool
 hasSome' [] = False
 hasSome' [(_, noden, _, outward)] = any ((== noden) . snd) outward
 hasSome' _ = True
@@ -114,7 +97,21 @@ treeToPaths (Tree.Node l []) = [[l]]
 treeToPaths (Tree.Node l sbf) = (l :) <$> concat (treeToPaths <$> sbf)
 
 {-|
-    Topsort inclusive of edges, assuming there are no cycles or multiple clashing substitutions.
+    Unlabel a graph but without losing as much information.
+
+    This transforms the graph by merging individual edge labels with their origin
+    nodes.
+
+    A Node labelled X with outward edges with labels [a,b,c] would be converted to
+    Nodes (X,a) (X,b) and (X,c). Each node would have the inward edges of the original
+    node X, although with respect to the transform being applied to all.
+
+    Nodes without any outward edges or loops will be lost by the process.
 -}
-edgeyTopsort :: Graph gr => gr n e -> Maybe ([Tree.Tree (n, e)], n)
-edgeyTopsort graph = undefined
+unlabelOutward :: forall gr n e. Graph gr => gr n e -> gr (n, e) ()
+unlabelOutward graph = undefined where
+    {-|
+        Get all the outward edges of a context.
+    -}
+    explodeIndividual :: Graph.Context n e -> [(n, e)]
+    explodeIndividual ctx = (,) (lab' ctx) . fst <$> (ctx^._4)

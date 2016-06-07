@@ -15,26 +15,40 @@ import Calculi.Lambda.Cube
 import Data.List
 import Control.Monad
 
+-- | Lambda Cube parsec type.
 type LCParsec = Parsec String
+-- | SystemFOmega with mono and poly types represented as strings.
 type StringSFO = SFO.SystemFOmega String String
+-- | SystemF with mono and poly types represented as strings.
 type StringSF = SF.SystemF String String
+-- | SimplyTyped with mono types represented as strings.
 type StringSTLC = STLC.SimplyTyped String
 
+{-|
+    Lambda Cube symbol wrapper for strings.
+-}
 lamcsymbol :: String -> LCParsec String
-lamcsymbol str = do
-    str' <- try $ string str
-    void $ many (string " ")
-    return str'
+lamcsymbol = lamctoken . string
 
+{-|
+    Lambda Cube parser token wrapper, expects the token followed by 0 or more spaces.
+-}
 lamctoken :: LCParsec a -> LCParsec a
 lamctoken p = do
     pval <- p
     void $ many (char ' ')
     return pval
 
+{-|
+    Parenthesis parser combinator.
+-}
 paren :: LCParsec a -> LCParsec a
 paren = between (lamcsymbol "(") (lamcsymbol ")")
 
+{-|
+    Wrapper that allows preceeding whitespace before a token and then expects the
+    input to end.
+-}
 wrapped :: LCParsec a -> LCParsec a
 wrapped p = do
     void $ many (lamcsymbol " ")
@@ -42,18 +56,34 @@ wrapped p = do
     eof
     return p'
 
+{-|
+    Parser for a bare variable, notated by beginning with a lowercase character.
+-}
 variable :: LCParsec String
 variable = lamctoken ((:) <$> lowerChar <*> many (lowerChar <|> upperChar)) <?> "variable"
 
+{-|
+    Parser for a bare constant, notated by beginning with an uppercase character.
+-}
 constant :: LCParsec String
 constant = lamctoken ((:) <$> upperChar <*> many (lowerChar <|> upperChar)) <?> "constant"
 
+{-|
+    Given a type expression parser for a Polymorphic typesystem, parse a forall
+    quantification (@∀ a b c. <expr>@ or @forall a b c. <expr>@) followed by
+    the expression parser that was passed to it.
+-}
 quant :: (Polymorphic t, String ~ PolyType t) => LCParsec t -> LCParsec t
 quant pexpr = label "quantification" $ do
+    -- Parse the prefix for quantification
     void $ lamcsymbol "∀" <|> lamcsymbol "forall"
+    -- Parse one or more variables
     tvars <- some variable
+    -- terminate the quantification expression with a period
     void $ lamcsymbol "."
+    -- parse the expression with the parser passed to this function
     expr <- pexpr
+    -- quantify each variable over the expression that was passed.
     return (foldr quantify expr tvars)
 
 {-|
@@ -74,8 +104,7 @@ exprsequence subexpr = label "expression sequence" $ do
 
 sfoexpr :: LCParsec StringSFO
 sfoexpr = label "System-Fω expression" $
-           paren sfoexpr
-       <|> quant sfoexpr
+           quant sfoexpr
        <|> exprsequence (fmap (foldl1 (/$)) <$> some $
                                     poly <$> variable
                                 <|> mono <$> constant
@@ -83,16 +112,13 @@ sfoexpr = label "System-Fω expression" $
 
 sfexpr :: LCParsec StringSF
 sfexpr = label "System-F expression" $
-          paren sfexpr
-      <|> quant sfexpr
+          quant sfexpr
       <|> exprsequence (poly <$> variable
                            <|> mono <$> variable
                            <|> paren sfexpr)
 
 stlcexpr :: LCParsec StringSTLC
-stlcexpr = many (lamcsymbol " ")
-        >> exprsequence (mono <$> constant <|> paren stlcexpr)
-        <?> "Simply-typed expression"
+stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|> paren stlcexpr)
 
 
 {-|
@@ -120,6 +146,9 @@ sf   = mkqq "sf" sfexpr
 stlc :: TH.QuasiQuoter
 stlc = mkqq "stlc" stlcexpr
 
+{-|
+    Helper to generate a QuasiQuoter for an arbitrary parser with a liftable type.
+-}
 mkqq :: TH.Lift t => String -> LCParsec t -> TH.QuasiQuoter
 mkqq pname p = TH.QuasiQuoter {
     TH.quoteExp = \str -> do

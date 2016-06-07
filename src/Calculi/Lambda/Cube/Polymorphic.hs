@@ -1,5 +1,25 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Calculi.Lambda.Cube.Polymorphic where
+module Calculi.Lambda.Cube.Polymorphic (
+      -- * Typeclass for Polymorphic Typesystems
+      Polymorphic(..)
+    , Substitution
+      -- ** Notation and related functions
+    , canSubstitute
+    , (⊑)
+    , areEquivalent
+    , (≣)
+    , (\-/)
+    , applyAllSubs
+      -- * Substitution Validation
+    , SubsErr(..)
+    , ClashTreeRoot
+      -- ** Validation related functions
+    , subsToGraph
+    , subsToGraphM
+    , unvalidatedApplyAllSubs
+    , topsortSubs
+    , topsortSubsG
+) where
 
 import           Calculi.Lambda.Cube.SimpleType
 import           Control.Monad
@@ -43,9 +63,8 @@ data SubsErr gr t p =
     -- is the type that has multiple substitutions and the second is the
     -- list of all the conflicting substitutions' paths.
     | CyclicSubstitution (gr t p)
+    -- ^ There is a cycle of
     deriving (Eq, Show, Read)
-
-data InferenceEnvironment v t = InferenceEnvironment
 
 {-|
     Class of typesystems that exhibit polymorphism.
@@ -65,7 +84,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
         a significant amount of analysis that is used in `canSubstitute`'s default
         implementation.
 
-        @`substitutions` (T → forall p. (p ~ PolyType t, Ord pG) (∀ a. (∀ b. a → b)) = Just [(T, a), (G, b)]@
+        @`substitutions` (T → G) (∀ a. (∀ b. a → b)) = Just [(T, a), (G, b)]@
 
         @`substitutions` (∀ a. a -> a) (∀ b. b) = Just [(a -> a, b)]@
     -}
@@ -99,41 +118,6 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
         @`unquantify` (X → b) = Nothing@
     -}
     unquantify :: t -> Maybe (PolyType t, t)
-
-    {-|
-        Calculate if one type can substitute another, should check if there are any error in the
-        substitutions such as cycles or multiple possible substitutions, then return true if
-        either both are identical or the substitutions don't conflict.
-
-        This is a lot to ask for, thankfully this is already implemented in terms of
-        `substitutions` and `subsToGraph`, this is here in case there's a more efficient
-        algorithm the library user knows about.
-    -}
-    canSubstitute :: t -> t -> Bool
-    canSubstitute x y =
-        -- NOTE: This doesn't work as implied by it's name on @canSubstitute (a → K) (M → b)@
-        -- but it this is still valid as far as type theory (and ghci) is concerned
-        fromMaybe False (isRight . subsToGraph' <$> substitutions x y) || x == y where
-            subsToGraph' :: [(t, PolyType t)] -> Either [SubsErr Gr t (PolyType t)] (Gr t (PolyType t))
-            subsToGraph' = subsToGraph
-
-    {-|
-        Check if two types are equivalent, where equivalence is defined as the substitutions
-        being made being symbolically identical, where binds and type variables appear in
-        the same place but may have different names.
-
-        @`areEquivalent` (∀ a. X → a) (∀ z. X → z) = True@
-
-        @`areEquivalent` (M → X) (M → X) = True@
-
-        @`areEquivalent` (∀ a. a) (∀ z. z → z) = False@
-    -}
-    areEquivalent :: t -> t -> Bool
-    areEquivalent x y = fromMaybe (x == y) $ do
-        subs1 <- nubSort . mapPoly <$> substitutions x y -- get the sorted substitutions of the first
-        subs2 <- nubSort . fmap swap . mapPoly <$> substitutions y x -- get the sorted substitutions of the second
-        return (subs1 == subs2) where
-            mapPoly = fmap (_2 %~ (poly :: PolyType t -> t))
 
     {-|
         Polymorphic constructor synonym, as many implementations will have a constructor along
@@ -178,6 +162,91 @@ infix 4 ≣
 
 infixr 6 \-/
 
+{-|
+    Calculate if one type can substitute another, should check if there are any error in the
+    substitutions such as cycles or multiple possible substitutions, then return true if
+    either both are identical or the substitutions don't conflict.
+
+    This is a lot to ask for, thankfully this is already implemented in terms of
+    `substitutions` and `subsToGraph`, this is here in case there's a more efficient
+    algorithm the library user knows about.
+-}
+canSubstitute :: forall t. Polymorphic t => t -> t -> Bool
+canSubstitute x y =
+    -- NOTE: This doesn't work as implied by it's name on @canSubstitute (a → K) (M → b)@
+    -- but it this is still valid as far as type theory (and ghci) is concerned
+    fromMaybe False (isRight . subsToGraph' <$> substitutions x y) || x == y where
+        subsToGraph' :: [(t, PolyType t)] -> Either [SubsErr Gr t (PolyType t)] (Gr t (PolyType t))
+        subsToGraph' = subsToGraph
+
+{-|
+    Check if two types are equivalent, where equivalence is defined as the substitutions
+    being made being symbolically identical, where binds and type variables appear in
+    the same place but may have different names.
+
+    @`areEquivalent` (∀ a. X → a) (∀ z. X → z) = True@
+
+    @`areEquivalent` (M → X) (M → X) = True@
+
+    @`areEquivalent` (∀ a. a) (∀ z. z → z) = False@
+-}
+areEquivalent :: forall t. Polymorphic t => t -> t -> Bool
+areEquivalent x y = fromMaybe (x == y) $ do
+    subs1 <- nubSort . mapPoly <$> substitutions x y -- get the sorted substitutions of the first
+    subs2 <- nubSort . fmap swap . mapPoly <$> substitutions y x -- get the sorted substitutions of the second
+    return (subs1 == subs2) where
+        mapPoly = fmap (_2 %~ (poly :: PolyType t -> t))
+
+{-|
+    For a given list of substitutions, either find and report inconsistencies
+    through `SubsErr` or compute a topsort by order of substitution such that for
+    a list of substitutions @[a, b, c]@ c should be applied, then b, then a.
+
+    This backward application is a product of how the graph used to compute
+    the reordering is notated and how topsorting is ordered. In this
+    graph for nodes @N, M@ and egde label @p@, @N --p-> M@ notates that
+    all instances of @p@ in @M@ will be substituted by @N@. In regular topsort
+    this means that @N@ will preceed @M@ in the list, but this doesn't make sense
+    when we topsort to tuples of the form @(N, p)@.
+-}
+topsortSubs :: forall gr t p. (DynGraph gr, Polymorphic t, p ~ PolyType t) => [(t, p)] -> Either [SubsErr gr t p] [(t, p)]
+topsortSubs = fmap topsortSubsG . (subsToGraph :: [(t, p)] -> Either [SubsErr gr t p] (gr t p))
+
+{-|
+    A version of `topsortSubs` that takes an already generated graph rather than
+    building it's own.
+
+    If given a graph with cycles or nodes with 2 or more inward edges of the same label
+    then there's no garuntee that the substitutions will be applied correctly.
+-}
+topsortSubsG :: Graph gr => gr t p -> [(t, p)]
+topsortSubsG graph =
+    let {-
+            For a topsort that maintains labels, we need to combine
+            labels and nodes into nodes themselves.
+
+        -}
+        graph' :: gr (t, p) ()
+        graph' = undefined
+    in undefined
+
+{-|
+    Without validating if the substitutions are consistent, fold them into a single
+    function that applies all substitutions to a given type expression.
+-}
+unvalidatedApplyAllSubs :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> Substitution t
+unvalidatedApplyAllSubs = foldr (\sub f -> uncurry applySubstitution sub . f) id
+
+{-|
+    Validate substitutions and fold them into a single substitution function.
+-}
+applyAllSubs :: (Polymorphic t, p ~ PolyType t, DynGraph gr) => [(t, p)] -> Either [SubsErr gr t p] (Substitution t)
+applyAllSubs = fmap unvalidatedApplyAllSubs . topsortSubs
+
+{-|
+    Function that builds a graph representing valid substitutions or reports
+    any part of the graph's structure that would make the substitutions invalid.
+-}
 subsToGraph
     :: forall t p gr. (Polymorphic t, p ~ PolyType t, Ord p, DynGraph gr)
     => [(t, p)]
@@ -199,7 +268,7 @@ subsToGraphM
     => [(t, p)]       -- ^ A list of substitutions
     -> NodeMapM t p gr [SubsErr gr t p]
                       -- ^ A nodemap monadic action where the graph's edges are substitutions
-                      -- and the nodes are types where substitutions should be
+                      -- and the nodes are type expressions.
 subsToGraphM subs = do
     {-
         Construct the graph so we have something to work with.
