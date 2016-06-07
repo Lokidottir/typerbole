@@ -15,6 +15,7 @@ module Calculi.Lambda.Cube.Polymorphic (
     , ClashTreeRoot
       -- ** Validation related functions
     , subsToGraph
+    , subsToGraphGr
     , subsToGraphM
     , unvalidatedApplyAllSubs
     , topsortSubs
@@ -219,16 +220,15 @@ topsortSubs = fmap topsortSubsG . (subsToGraph :: [(t, p)] -> Either [SubsErr gr
     If given a graph with cycles or nodes with 2 or more inward edges of the same label
     then there's no garuntee that the substitutions will be applied correctly.
 -}
-topsortSubsG :: Graph gr => gr t p -> [(t, p)]
+topsortSubsG :: forall gr t p. (DynGraph gr, Ord t, Ord p) => gr t p -> [(t, p)]
 topsortSubsG graph =
     let {-
             For a topsort that maintains labels, we need to combine
             labels and nodes into nodes themselves.
-
         -}
         graph' :: gr (t, p) ()
-        graph' = undefined
-    in undefined
+        graph' = unlabelOutward graph
+    in topsort' graph'
 
 {-|
     Without validating if the substitutions are consistent, fold them into a single
@@ -248,13 +248,17 @@ applyAllSubs = fmap unvalidatedApplyAllSubs . topsortSubs
     any part of the graph's structure that would make the substitutions invalid.
 -}
 subsToGraph
-    :: forall t p gr. (Polymorphic t, p ~ PolyType t, Ord p, DynGraph gr)
+    :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
     => [(t, p)]
     -> Either [SubsErr gr t p] (gr t p)
 subsToGraph subs =
     let (errs, (_, graph :: gr t p)) = run empty (subsToGraphM subs)
     in if null errs then Right graph else Left errs
 
+subsToGraphGr :: forall t p. (Polymorphic t, p ~ PolyType t)
+              => [(t,p)]
+              -> Either [SubsErr Gr t p] (Gr t p)
+subsToGraphGr = subsToGraph
 {-|
     A version of `subsToGraph` that works within fgl's NodeMap state monad.
 -}

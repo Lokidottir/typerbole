@@ -44,7 +44,7 @@ cyclesOfGraph graph = fromMaybe []   -- give a default to bring this out of the 
     Given a graph, generate a possibly empty list of subgraphs that are the it's cycles.
 -}
 cyclicSubgraphs :: forall gr n e. (DynGraph gr, Ord n, Ord e) => gr n e -> [gr n e]
-cyclicSubgraphs graph = flip subgraph graph <$> scc graph
+cyclicSubgraphs graph = flip subgraph graph <$> filter hasSome (scc graph)
 
 -- | Returns true if a list has more than 1 element
 hasSome :: [a] -> Bool
@@ -108,10 +108,38 @@ treeToPaths (Tree.Node l sbf) = (l :) <$> concat (treeToPaths <$> sbf)
 
     Nodes without any outward edges or loops will be lost by the process.
 -}
-unlabelOutward :: forall gr n e. Graph gr => gr n e -> gr (n, e) ()
-unlabelOutward graph = undefined where
-    {-|
-        Get all the outward edges of a context.
-    -}
-    explodeIndividual :: Graph.Context n e -> [(n, e)]
-    explodeIndividual ctx = (,) (lab' ctx) . fst <$> (ctx^._4)
+unlabelOutward :: forall gr n e. (DynGraph gr, Ord n, Ord e) => gr n e -> gr (n, e) ()
+unlabelOutward graph = run_ empty $ do
+    let es = fmap unnode'' . Ord.nubSort . concatMap edgeTransform $ labEdges graph
+    insMapNodesM ns
+    insMapEdgesM es where
+        -- all the old nodes, transformed to map to each of their edges.
+        ns = Ord.nubSort $ concatMap ctxToNewNodes (gsel (const True) graph)
+
+        {-|
+            Transform an edge into a set of edges.
+
+            The target (second node of the input 3-tuple) has outward edges, and for
+            each of them a new node in the final graph will be created.
+        -}
+        edgeTransform :: (Node, Node, e) -> [((Node, e), (Node, e), ())]
+        edgeTransform (origin, target, label) = (\n -> (origin', n, ())) <$> targetsNewNodes where
+            targetsNewNodes = (,) target . fst <$> (context graph target)^._4
+
+            -- Origin node with the edge label
+            origin' = (origin, label)
+
+        ctxToNewNodes :: Graph.Context n e -> [(n, e)]
+        ctxToNewNodes (_, _, nl, outward) = (,) nl . fst <$> outward
+
+        unnode :: Node -> n
+        unnode = lab' . context graph
+
+        unnode' :: (Node, e) -> (n, e)
+        unnode' = _1 %~ unnode
+
+        unnode'' :: ((Node, e), (Node, e), ()) -> ((n, e), (n, e), ())
+        unnode'' = (_1 %~ unnode') . (_2 %~ unnode')
+
+        unnode''' :: ((Node, e), (Node, e), ()) -> ((n, e), (n, e), ())
+        unnode''' = (_1._1 %~ lab' . context graph) . ((_2._1 %~ lab' . context graph))
