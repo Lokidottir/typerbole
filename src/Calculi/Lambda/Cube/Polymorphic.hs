@@ -6,6 +6,7 @@ module Calculi.Lambda.Cube.Polymorphic (
       -- ** Notation and related functions
     , canSubstitute
     , (⊑)
+    , (\<)
     , areEquivalent
     , (≣)
     , (\-/)
@@ -25,7 +26,7 @@ module Calculi.Lambda.Cube.Polymorphic (
 import           Calculi.Lambda.Cube.SimpleType
 import           Control.Monad
 import           Control.Monad.State.Class
-import           Data.Either
+import           Data.Either.Combinators
 import           Data.Function hiding ((&))
 import           Data.Graph.Inductive as Graph
 import           Data.Graph.Inductive.Helper
@@ -113,11 +114,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     {-|
         Split a quantification into it's variable being quantified and
         the expression targeted by the quantification. A safe inverse of `quantify`.
-
-        @`unquantify` (∀ a. M → a) = Just (a, M → a)@
-
-        @`unquantify` (X → b) = Nothing@
-    -}
+&&-}
     unquantify :: t -> Maybe (PolyType t, t)
 
     {-|
@@ -139,13 +136,38 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     ftvs :: t -> Set.Set t
 
 {-|
-    Infix, flipped `canSubstitute` corresponding to the type ordering operator used in
-    much of type theory.
+    Type ordering operator, true if the first argument is more specific or equal to
+    the second.
 -}
 (⊑) :: Polymorphic t => t -> t -> Bool
-(⊑) = flip canSubstitute
+t' ⊑ t =
+    let
+        {-
+            Get all the substitutions of t' over t
+        -}
+        subs = substitutions t' t
+        {-
+            Assuming getting the substitutions succeeded, validate and apply them together.
+        -}
+        appedSubs = applyAllSubsGr (fromMaybe [] subs)
+        {-
+            Assuming the substitutions were valid, pull the substitution function out of
+            Either, using the identity function in case of a Left value.
+        -}
+        appedSubs' = fromRight id appedSubs
+        -- Assuming the substitutions succeeded and were valid, check that t' is equal to the
+        -- substitutions it implies for t being applied to t.
+    in isJust subs && isRight appedSubs && t' ≣ appedSubs' t
 
 infix 4 ⊑
+
+{-|
+    Non-unicode `(⊑)`.
+-}
+(\<) :: Polymorphic t => t -> t -> Bool
+(\<) = (⊑)
+
+infix 4 \<
 
 {-|
     Infix `areEquivalent`
@@ -167,10 +189,6 @@ infixr 6 \-/
     Calculate if one type can substitute another, should check if there are any error in the
     substitutions such as cycles or multiple possible substitutions, then return true if
     either both are identical or the substitutions don't conflict.
-
-    This is a lot to ask for, thankfully this is already implemented in terms of
-    `substitutions` and `subsToGraph`, this is here in case there's a more efficient
-    algorithm the library user knows about.
 -}
 canSubstitute :: forall t. Polymorphic t => t -> t -> Bool
 canSubstitute x y =
@@ -220,16 +238,8 @@ topsortSubs = fmap topsortSubsG . (subsToGraph :: [(t, p)] -> Either [SubsErr gr
     If given a graph with cycles or nodes with 2 or more inward edges of the same label
     then there's no garuntee that the substitutions will be applied correctly.
 -}
-topsortSubsG :: forall gr t p. (DynGraph gr, Ord t, Ord p) => gr t p -> [(t, p)]
-topsortSubsG graph =
-    let {-
-            For a topsort that maintains labels, we need to combine
-            labels and nodes into nodes themselves.
-        -}
-        graph' :: gr (t, p) ()
-        graph' = unlabelOutward graph
-    in topsort' graph'
-
+topsortSubsG :: forall gr t p. (Graph gr) => gr t p -> [(t, p)]
+topsortSubsG = unvalidatedEdgeyTopsort
 {-|
     Without validating if the substitutions are consistent, fold them into a single
     function that applies all substitutions to a given type expression.
@@ -240,8 +250,11 @@ unvalidatedApplyAllSubs = foldr (\sub f -> uncurry applySubstitution sub . f) id
 {-|
     Validate substitutions and fold them into a single substitution function.
 -}
-applyAllSubs :: (Polymorphic t, p ~ PolyType t, DynGraph gr) => [(t, p)] -> Either [SubsErr gr t p] (Substitution t)
+applyAllSubs :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr) => [(t, p)] -> Either [SubsErr gr t p] (Substitution t)
 applyAllSubs = fmap unvalidatedApplyAllSubs . topsortSubs
+
+applyAllSubsGr :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> Either [SubsErr Gr t p] (Substitution t)
+applyAllSubsGr = applyAllSubs
 
 {-|
     Function that builds a graph representing valid substitutions or reports

@@ -1,6 +1,9 @@
 module Data.Graph.Inductive.Helper where
 
+import           Control.Monad
+import           Control.Lens hiding ((&))
 import           Data.Graph.Inductive as Graph
+import           Data.List
 import qualified Data.List.Ordered    as Ord
 import qualified Data.Map             as Map
 import           Data.Maybe
@@ -8,7 +11,7 @@ import qualified Data.Set             as Set
 import           Data.Tuple
 import qualified Data.Tree            as Tree
 import qualified Data.List.NonEmpty   as NE
-import           Control.Lens hiding ((&))
+import           Safe
 
 findRootPaths :: Graph gr => gr n e -> Graph.Context n e -> (Node, [[Node]])
 findRootPaths = findRootPathsBy (\(_, node, _, _) -> node)
@@ -97,49 +100,28 @@ treeToPaths (Tree.Node l []) = [[l]]
 treeToPaths (Tree.Node l sbf) = (l :) <$> concat (treeToPaths <$> sbf)
 
 {-|
-    Unlabel a graph but without losing as much information.
+    Build a topsort inclusive of outward edges. Nodes without outward edges
+    are ignored.
 
-    This transforms the graph by merging individual edge labels with their origin
-    nodes.
-
-    A Node labelled X with outward edges with labels [a,b,c] would be converted to
-    Nodes (X,a) (X,b) and (X,c). Each node would have the inward edges of the original
-    node X, although with respect to the transform being applied to all.
-
-    Nodes without any outward edges or loops will be lost by the process.
+    If there are cycles in the graph, Nothing is returned.
 -}
-unlabelOutward :: forall gr n e. (DynGraph gr, Ord n, Ord e) => gr n e -> gr (n, e) ()
-unlabelOutward graph = run_ empty $ do
-    let es = fmap unnode'' . Ord.nubSort . concatMap edgeTransform $ labEdges graph
-    insMapNodesM ns
-    insMapEdgesM es where
-        -- all the old nodes, transformed to map to each of their edges.
-        ns = Ord.nubSort $ concatMap ctxToNewNodes (gsel (const True) graph)
+edgeyTopsort :: Graph gr => gr n e -> Maybe [(n, e)]
+edgeyTopsort graph
+    | not (null (cyclesOfGraph graph)) = Nothing
+    | otherwise = Just (unvalidatedEdgeyTopsort graph)
 
-        {-|
-            Transform an edge into a set of edges.
-
-            The target (second node of the input 3-tuple) has outward edges, and for
-            each of them a new node in the final graph will be created.
-        -}
-        edgeTransform :: (Node, Node, e) -> [((Node, e), (Node, e), ())]
-        edgeTransform (origin, target, label) = (\n -> (origin', n, ())) <$> targetsNewNodes where
-            targetsNewNodes = (,) target . fst <$> (context graph target)^._4
-
-            -- Origin node with the edge label
-            origin' = (origin, label)
-
-        ctxToNewNodes :: Graph.Context n e -> [(n, e)]
-        ctxToNewNodes (_, _, nl, outward) = (,) nl . fst <$> outward
-
-        unnode :: Node -> n
-        unnode = lab' . context graph
-
-        unnode' :: (Node, e) -> (n, e)
-        unnode' = _1 %~ unnode
-
-        unnode'' :: ((Node, e), (Node, e), ()) -> ((n, e), (n, e), ())
-        unnode'' = (_1 %~ unnode') . (_2 %~ unnode')
-
-        unnode''' :: ((Node, e), (Node, e), ()) -> ((n, e), (n, e), ())
-        unnode''' = (_1._1 %~ lab' . context graph) . ((_2._1 %~ lab' . context graph))
+{-|
+    `edgeyTopsort` but doesn't check for cycles first.
+-}
+unvalidatedEdgeyTopsort :: Graph gr => gr n e -> [(n, e)]
+unvalidatedEdgeyTopsort graph =
+    {-
+        In a cycle-less graph, there should always be 1 node
+        that has no inward edge. If there's not, then we've
+        finished the topsort
+    -}
+    let candidate = headMay $ gsel (null . inn') graph
+    in case (flip match graph . node' <$> candidate) of
+        Nothing                 -> []
+        Just (Nothing, _)       -> []
+        Just (Just ctx, graph') -> (fmap (\(_, _, l) -> (lab' ctx, l)) (out' ctx)) ++ unvalidatedEdgeyTopsort graph'

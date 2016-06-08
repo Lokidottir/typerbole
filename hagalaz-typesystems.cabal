@@ -47,6 +47,7 @@ library
                      , template-haskell
                      , th-lift
                      , megaparsec
+                     , safe
   ghc-options:         -threaded
                        -Wall
                        -fno-warn-type-defaults

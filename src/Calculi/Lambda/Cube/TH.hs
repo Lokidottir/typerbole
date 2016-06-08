@@ -123,6 +123,8 @@ stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|>
 
 {-|
     A QuasiQuoter for SystemFOmega, allowing arbitrary type application
+
+    @[sfo| forall x. R x -> M x |] == quantify \"x\" (mono \"R\" /$ poly \"x\" /-> Mono \"M\" /$ poly \"x\")@
 -}
 sfo :: TH.QuasiQuoter
 sfo = mkqq "sfo" sfoexpr
@@ -130,7 +132,7 @@ sfo = mkqq "sfo" sfoexpr
 {-|
     A QuasiQuoter for SystemF, allowing quantification and type variables (lower case).
 
-    @[sf| forall a b. a -> b |] == quantify \"a\" (quantify \"b\" (Poly \"a\" \/-> Poly \"b\"))@
+    @[sf| forall a b. a -> b |] == quantify \"a\" (quantify \"b\" (poly \"a\" \/-> poly \"b\"))@
 
 -}
 sf :: TH.QuasiQuoter
@@ -139,9 +141,9 @@ sf   = mkqq "sf" sfexpr
 {-|
     A QuasiQuoter for SimplyTyped.
 
-    @[stlc| A -> B -> C |] == Mono \"A\" \/-> Mono \"B\" \/-> Mono \"C\"@
+    @[stlc| A -> B -> C |] == mono \"A\" \/-> mono \"B\" \/-> mono \"C\"@
 
-    @[stlc| (A -> B) -> B |] == (Mono \"A\" \/-> Mono \"B\") \/-> Mono \"B\"@
+    @[stlc| (A -> B) -> B |] == (mono \"A\" \/-> mono \"B\") \/-> mono \"B\"@
 -}
 stlc :: TH.QuasiQuoter
 stlc = mkqq "stlc" stlcexpr

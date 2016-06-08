@@ -30,13 +30,14 @@ followsSimpleType :: (SimpleType t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $
     prop "follows abstract-reify inverse law" $ abstractInverse <$> gen <*> gen
 
-followsPolymorphic :: (Polymorphic t, Show t, Arbitrary t, PolyType t ~ Integer) => Gen t -> Spec
+followsPolymorphic :: forall t. (Polymorphic t, Show t, Arbitrary t, PolyType t ~ Integer) => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "equivalence is reflexive" $
         (\ !ty -> ty ≣ ty) <$> gen
     prop "substitution is reflexive" $
         (\ !ty -> ty `canSubstitute` ty) <$> gen
     prop "follows quantify-unquantify inverse law" $ quantifyInverse <$> arbitrary <*> gen
+    prop "follows type-ordering rule 1" (typeOrderingRule :: t -> Bool)
 
 followsHigherOrder :: (HigherOrder t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
@@ -61,3 +62,6 @@ quantifyInverse !ta !tb = fmap (uncurry quantify) (unquantify (quantify ta tb)) 
 
 typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
+
+typeOrderingRule :: (Polymorphic t, PolyType t ~ Integer) => t -> Bool
+typeOrderingRule t = t \< poly 900000
