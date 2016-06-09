@@ -3,7 +3,6 @@ module Calculi.Lambda.Cube.Systems.SystemFOmega where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.HigherOrder
-import           Calculi.Lambda.Cube.Inferable
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
 import qualified Language.Haskell.TH.Lift as TH

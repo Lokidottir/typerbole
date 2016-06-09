@@ -15,6 +15,7 @@ module Calculi.Lambda.Cube.Polymorphic (
     , applyAllSubs
     , typeVariables
     , boundTypeVariables
+    , typeConstants
       -- * Substitution Validation
     , SubsErr(..)
     , ClashTreeRoot
@@ -28,6 +29,7 @@ module Calculi.Lambda.Cube.Polymorphic (
 ) where
 
 import           Calculi.Lambda.Cube.SimpleType
+import           Calculi.Lambda.Cube.Typechecking
 import           Control.Monad
 import           Control.Monad.State.Class
 import           Data.Either.Combinators
@@ -49,28 +51,6 @@ import qualified Control.Lens as Lens ((&))
     A type alias for substitutions, which are just endomorphisms.
 -}
 type Substitution t = t -> t
-
-{-|
-    A substitution clash's root, with a tree of types substituting
-    variables as the first element [1] and the second element being the
-    type where these clashing substitutions converge.
-
-    [1]: to be read that the first element of the tuple is a forest of
-    substitutions leading the final type (the second element), and
-    because of their convergence the first layer of the trees should
-    all be substituting the same variable.
--}
-type ClashTreeRoot t p = ([Tree (t, [p])], t)
-
--- TODO: Maybe rename the constructors and recomment
-data SubsErr gr t p =
-      MultipleSubstitutions (ClashTreeRoot t p)
-    -- ^ There are multiple possible substitutions, the first argument here
-    -- is the type that has multiple substitutions and the second is the
-    -- list of all the conflicting substitutions' paths.
-    | CyclicSubstitution (gr t p)
-    -- ^ There is a cycle of
-    deriving (Eq, Show, Read)
 
 {-|
     Class of typesystems that exhibit polymorphism.
@@ -118,7 +98,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     {-|
         Split a quantification into it's variable being quantified and
         the expression targeted by the quantification. A safe inverse of `quantify`.
-&&-}
+    -}
     unquantify :: t -> Maybe (PolyType t, t)
 
     {-|
@@ -166,7 +146,7 @@ t' ⊑ t =
 infix 4 ⊑
 
 {-|
-    Non-unicode `(⊑)`.
+    Non-unicode @(⊑)@.
 -}
 (\<) :: Polymorphic t => t -> t -> Bool
 (\<) = (⊑)
@@ -202,12 +182,18 @@ boundTypeVariables :: Polymorphic t => t -> Set.Set t
 boundTypeVariables t = Set.difference (typeVariables t) (freeTypeVariables t)
 
 {-|
+    Type constants/Mono types of a type expression.
+-}
+typeConstants :: Polymorphic t => t -> Set.Set t
+typeConstants t = Set.difference (bases t) (typeVariables t)
+
+{-|
     Quantify every free type variable in a type expression, excluding a
     set of free type variables to not quantify.
 
     @`generalise` Set.empty (x → y) = (∀ x y. x → y) @
 
-    @`generalise` (Set.fromList []) @
+    @`generalise` (Set.fromList [a, b]) (a → b → c) = (∀ c. a → b → c) @
 -}
 generalise :: forall t. Polymorphic t => Set.Set t -> t -> t
 generalise exclude t = foldr quantify t ftvsBare where
