@@ -88,10 +88,10 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
 
     poly = Poly
 
-    ftvs = \case
+    freeTypeVariables = \case
         p@(Poly _)    -> Set.singleton p
-        Forall p sf   -> Set.delete (Poly p) (ftvs sf)
-        TypeAp tl tr  -> ftvs tl <> ftvs tr
+        Forall p sf   -> Set.delete (Poly p) (freeTypeVariables sf)
+        TypeAp tl tr  -> freeTypeVariables tl <> freeTypeVariables tr
         _             -> Set.empty
 
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where

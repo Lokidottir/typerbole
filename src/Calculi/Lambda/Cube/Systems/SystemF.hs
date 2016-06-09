@@ -73,11 +73,11 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 
     poly = Poly
 
-    ftvs = \case
+    freeTypeVariables = \case
         Mono _ -> Set.empty
         p@Poly{} -> Set.singleton p
-        Forall p expr -> Set.delete (Poly p) (ftvs expr)
-        Function l r -> ftvs l <> ftvs r
+        Forall p expr -> Set.delete (Poly p) (freeTypeVariables expr)
+        Function l r -> freeTypeVariables l <> freeTypeVariables r
 
 instance (Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p

@@ -26,24 +26,24 @@ type SimplyTyped' = SimplyTyped Integer
 type SystemFOmega' = SystemFOmega Integer Integer
 type SystemF' = SF.SystemF Integer Integer
 
-followsSimpleType :: (SimpleType t) => Gen t -> Spec
+followsSimpleType :: forall t. (SimpleType t, Show t, Arbitrary t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $
-    prop "follows abstract-reify inverse law" $ abstractInverse <$> gen <*> gen
+    prop "follows abstract-reify inverse law" $ (abstractInverse :: t -> t -> Bool)
 
 followsPolymorphic :: forall t. (Polymorphic t, Show t, Arbitrary t, PolyType t ~ Integer) => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "equivalence is reflexive" $
-        (\ !ty -> ty ≣ ty) <$> gen
+        ((\ ty -> ty ≣ ty) :: t -> Bool)
     prop "substitution is reflexive" $
-        (\ !ty -> ty `canSubstitute` ty) <$> gen
-    prop "follows quantify-unquantify inverse law" $ quantifyInverse <$> arbitrary <*> gen
+        ((\ ty -> ty `canSubstitute` ty) :: t -> Bool)
+    prop "follows quantify-unquantify inverse law" $ (quantifyInverse :: Integer -> t -> Bool)
     prop "follows type-ordering rule 1" (typeOrderingRule :: t -> Bool)
 
-followsHigherOrder :: (HigherOrder t) => Gen t -> Spec
+followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
     prop "follows kind-unkind inverse law" $
-        (\ty -> unkind (kind ty) == Just ty) <$> gen
-    prop "follows typeap-untypeap inverse law" $ typeapInverse <$> gen <*> gen
+        ((\ty -> unkind (kind ty) == Just ty) :: t -> Bool)
+    prop "follows typeap-untypeap inverse law" $ (typeapInverse ::  t -> t -> Bool)
 
 {-|
     An expression of type "(0 -> 5) -> 0 -> 5"

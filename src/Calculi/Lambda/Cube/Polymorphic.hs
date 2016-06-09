@@ -10,7 +10,11 @@ module Calculi.Lambda.Cube.Polymorphic (
     , areEquivalent
     , (≣)
     , (\-/)
+    , generalise
+    , generalise'
     , applyAllSubs
+    , typeVariables
+    , boundTypeVariables
       -- * Substitution Validation
     , SubsErr(..)
     , ClashTreeRoot
@@ -124,16 +128,16 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     poly :: PolyType t -> t
 
     {-|
-        Function retrives all the free type variables (hence "ftvs") in a type.
+        Function retrives all the free type variables in a type.
         If the type is itself an unbound poly type, then that is returned.
 
-        @`ftvs` (∀ a. (∀ b. a → b → c d)) = `Set.fromList` [c, d]@
+        @`freeTypeVariables` (∀ a. (∀ b. a → b → c d)) = `Set.fromList` [c, d]@
 
-        @`ftvs` (a → b → c) = `Set.fromList` [a, b, c]@
+        @`freeTypeVariables` (a → b → c) = `Set.fromList` [a, b, c]@
 
-        @`ftvs` (∀ c. X → c) = `Set.empty`@
+        @`freeTypeVariables` (∀ c. X → c) = `Set.empty`@
     -}
-    ftvs :: t -> Set.Set t
+    freeTypeVariables :: t -> Set.Set t
 
 {-|
     Type ordering operator, true if the first argument is more specific or equal to
@@ -184,6 +188,40 @@ infix 4 ≣
 (\-/) = quantify
 
 infixr 6 \-/
+
+{-|
+    All the type variables in a type expression, bound or unbound.
+-}
+typeVariables :: Polymorphic t => t -> Set.Set t
+typeVariables t = Set.fromList $ poly . snd <$> fromMaybe [] (substitutions t t)
+
+{-|
+    Bound type variables of an expression.
+-}
+boundTypeVariables :: Polymorphic t => t -> Set.Set t
+boundTypeVariables t = Set.difference (typeVariables t) (freeTypeVariables t)
+
+{-|
+    Quantify every free type variable in a type expression, excluding a
+    set of free type variables to not quantify.
+
+    @`generalise` Set.empty (x → y) = (∀ x y. x → y) @
+
+    @`generalise` (Set.fromList []) @
+-}
+generalise :: forall t. Polymorphic t => Set.Set t -> t -> t
+generalise exclude t = foldr quantify t ftvsBare where
+    ftvsBare :: Set.Set (PolyType t)
+    ftvsBare = Set.fromList $ snd <$> filter (flip Set.member ftvs . fst) polyTypes where
+        ftvs = Set.difference (freeTypeVariables t) exclude
+        polyTypes :: [(t, PolyType t)]
+        polyTypes = fromMaybe [] $ substitutions t t
+
+{-|
+    `generalise` but with an empty exclusion set.
+-}
+generalise' :: Polymorphic t => t -> t
+generalise' = generalise Set.empty
 
 {-|
     Calculate if one type can substitute another, should check if there are any error in the
@@ -296,7 +334,7 @@ subsToGraphM subs = do
        have at least one edge from the substitutions to the targets. -}
     let typeExprs = nubSort $ concat ((\(t, p) -> [t, poly p]) <$> subs)
     -- Build a list of type expressions and their bases.
-    let basesList = (\t -> (t, bases t)) <$> typeExprs
+    let basesList = (\t -> (t, typeVariables t)) <$> typeExprs
     -- Construct the edges
     let subsEdges = buildEdge <$> subs <*> basesList
     -- Insert the nodes. (crashes if this isn't done first, because fgl!)
