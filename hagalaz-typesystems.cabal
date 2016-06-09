@@ -62,6 +62,7 @@ library
                      , TypeFamilies
                      , QuasiQuotes
                      , TypeOperators
+                     , MultiParamTypeClasses
 
 
 test-suite hagalaz-testing

@@ -14,6 +14,8 @@ module Calculi.Lambda.Cube.Typechecking (
     -- ** Polymorphic types
     , SubsErr(..)
     , ClashTreeRoot
+    -- * Type Helpers
+    , (:+:)
 ) where
 
 
@@ -78,7 +80,14 @@ data SubsErr gr t p =
     -- ^ There is a cycle of
     deriving (Eq, Show, Read)
 
-class SimpleType t => Typecheckable t where
+{-|
+    Infix `Either`
+-}
+type (:+:) = Either
+
+infixr 1 :+:
+
+class SimpleType t => Typecheckable v t where
     {-|
         The typing context, in type theory this is usually denoted as 𝚪.
 
@@ -87,37 +96,35 @@ class SimpleType t => Typecheckable t where
         for the implementer though as other typesystems might need extra information
         in their contexts.
     -}
-    type TypingContext t :: *
+    type TypingContext v t :: *
 
     {-|
         The type error representation.
     -}
-    type TypeError t :: *
+    type TypeError v t :: *
 
     {-|
         Given a typing context, typecheck an expression and either return a typeerror or the
         type of the expression that was passed.
     -}
-    typecheck :: Ord v
-              => TypingContext t             -- ^ The given context
-              -> LambdaExpr v t              -- ^ The expression to typecheck
-              -> Either (TypeError t)
-                        (TypingContext t, t) -- ^ The result
+    typecheck :: TypingContext v t             -- ^ The given context
+              -> LambdaExpr v t                -- ^ The expression to typecheck
+              -> Either [TypeError v t]
+                        (TypingContext v t, t) -- ^ The result
 
-class (Typecheckable t) => Inferable t where
+class (Typecheckable v t) => Inferable v t where
 
     {-|
         The inference context, has a similar function to `TypingContext`
     -}
-    type InferenceContext t :: *
+    type InferenceContext v t :: *
 
     {-|
         The inference error representation.
     -}
-    type InferError t :: *
+    type InferError v t :: *
 
-    infer :: Ord v
-          => InferenceContext t                          -- ^ The given context 
-          -> LambdaExpr v (Maybe t)                      -- ^ The expression to infer from
-          -> Either (InferError t)
-                    (InferenceContext t, LambdaExpr v t) -- ^ The result
+    infer :: InferenceContext v t                          -- ^ The given context
+          -> LambdaExpr v (Maybe t)                        -- ^ The expression to infer from
+          -> Either (InferError v t)
+                    (InferenceContext v t, LambdaExpr v t) -- ^ The result
