@@ -35,7 +35,7 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "equivalence is reflexive" $
         ((\ ty -> ty ≣ ty) :: t -> Bool)
     prop "substitution is reflexive" $
-        ((\ ty -> ty `canSubstitute` ty) :: t -> Bool)
+        ((\ ty -> ty `hasSubstitutions` ty) :: t -> Bool)
     prop "follows quantify-unquantify inverse law" $ (quantifyInverse :: Integer -> t -> Bool)
     prop "follows type-ordering rule 1" (typeOrderingRule :: t -> Bool)
 

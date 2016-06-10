@@ -1,7 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Calculi.Lambda.Cube.HigherOrder where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
+import           Calculi.Lambda.Cube.Typechecking
 import           Calculi.Lambda.Cube.Systems.SimplyTyped as SimplyTyped
 import qualified Data.Map                                as Map
 
@@ -16,19 +18,18 @@ data Star =
     deriving (Eq, Ord, Show, Read)
 
 {-|
-    Simply-typed lambda calculus at the type level, describing the
-    kindedness of a type expression and used to typecheck/infer
+    Typed lambda calculus target of Kind
 -}
-type Kindedness t = LambdaExpr t (SimplyTyped (Kind t))
+type Kindedness t = LambdaExpr t (Kindsystem t)
 
 {-|
     Typeclass for higher-order types.
 -}
-class SimpleType t => HigherOrder t where
+class (Typecheckable t (Kindsystem t), SimpleType t) => HigherOrder t where
     {-|
         The representation of kind constants.
     -}
-    type Kind t :: *
+    type Kindsystem t :: *
 
     {-|
         Construct a kind expression describing the application and abstraction of
@@ -74,6 +75,16 @@ class SimpleType t => HigherOrder t where
     untypeap x = case kind x of
         Apply a b -> (,) <$> unkind a <*> unkind b
         _         -> Nothing
+
+{-|
+    Typecheck a type expression's kindedness.
+-}
+kindcheck :: forall t ksys. (Kindsystem t ~ ksys, HigherOrder t)
+          => TypingContext t ksys                -- ^ A typing context for typechecking
+          -> t                                   -- ^ A type expression to kindcheck
+          -> Either [TypeError t ksys]
+                    (TypingContext t ksys, ksys) -- ^ The result.
+kindcheck ctx texpr = typecheck ctx (kind texpr)
 
 {-|
     Infix `typeap`.

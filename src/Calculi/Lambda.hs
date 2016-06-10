@@ -1,6 +1,19 @@
-module Calculi.Lambda where
+module Calculi.Lambda (
+      -- * Typed Lambda Calculus AST.
+      LambdaExpr(..)
+    , UntypedLambdaExpr
+      -- ** Analysis Helpers
+    , freeVars
+      -- * Let declaration helpers
+    , LetDeclr
+    , unlet
+    , letsDependency
+    , letsDependency'
+) where
 
 import           Data.Bifunctor.TH
+import           Data.Either.Combinators
+import           Data.Either (lefts, partitionEithers)
 import           Data.Generics (Data(..))
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
@@ -12,11 +25,10 @@ import qualified Data.Set                    as Set
 import           Test.QuickCheck
 
 {-|
-    A simple lambda calculus AST with Let expressions.
+    A simple typed lambda calculus AST.
 -}
 data LambdaExpr v t =
       Var v                                   -- ^ A reference to a variable
-    | Let [LetDeclr v t] (LambdaExpr v t)     -- ^ A let expression
     | Apply (LambdaExpr v t) (LambdaExpr v t) -- ^ An application of one expression to another
     | Lambda (v, t) (LambdaExpr v t)          -- ^ A varexpr and a function body
     deriving (Eq, Ord, Show, Data)
@@ -73,41 +85,25 @@ letsDependency' lets =
     in snd . run empty $ insMapEdgesM (concat $ inwardEdges <$> lets)
 
 {-|
-    For a given expression, attempt to convert the let expressions into lambda
-    expressions. Any let expressions left over after this conversion would be
-    the result of cycles in those let expressions.
--}
-deepUnlet :: (Ord v, Ord t) => LambdaExpr v t -> LambdaExpr v t
-deepUnlet = \case
-    var@(Var _)    -> var
-    Let lets expr  -> unlet lets (deepUnlet expr)
-    Apply fun arg  -> Apply (deepUnlet fun) (deepUnlet arg)
-    Lambda vt expr -> Lambda vt (deepUnlet expr)
-
-{-|
-    Unlet the content of a single let expression, not recursing on the let's
-    body.
+    Unlet non-cyclic let expressions.
 -}
 unlet :: forall v t.
        (Ord v, Ord t)
     => [LetDeclr v t] -- ^ The list of declarations in a let expression
-    -> LambdaExpr v t -- ^ The let expression's body
-    -> LambdaExpr v t -- ^ The final expression with the same or fewer let expressions
+    -> LambdaExpr v t -- ^ The body of the let declaration
+    -> Either [[LetDeclr v t]]
+              (LambdaExpr v t) -- ^ Either a list of cyclic lets or the final expression
 unlet lets expr =
     let -- Build the dependency graph
         depends :: Gr (LetDeclr v t) () = letsDependency lets
         -- Get the regular topsort.
         tsorted            = topsortWithCycles depends
+        (cycles, lets')    = partitionEithers tsorted
         -- This is what turns the cycles found in tsorted
         -- to let expressions and the non-cycle nodes into
         -- lambda-apply name scoping.
-        unlet' val lexpr  = case val of
-            -- A cycle appears, turn it back into a Let
-            Left cy     -> Let cy lexpr
-            -- A declaration appears, name the body of the declaration using
-            -- a lambda expression instead. e.g. ((\x -> x) y) names y as x.
-            Right (declr, body) -> Lambda declr lexpr `Apply` body
-    in foldr unlet' expr tsorted
+        unlet' (declr, body) lexpr = Lambda declr lexpr `Apply` body
+    in if null cycles then Right (foldr unlet' expr lets') else Left cycles
 
 {-|
     Find all the unbound variables in an expression.
@@ -115,13 +111,6 @@ unlet lets expr =
 freeVars :: Ord v => LambdaExpr v t -> Set.Set v
 freeVars = \case
     Var v              -> Set.singleton v
-    Let lets expr      ->
-        -- Combine all the free variables from the declared variables
-        -- and the let's target expression before removing all declared
-        -- variables from the set.
-        Set.difference
-            (mconcat $ freeVars expr : (freeVars . snd <$> lets))
-            (Set.fromList (fst . fst <$> lets))
     Apply fun arg      ->
         -- Union the free variables of both parts of the Apply
         freeVars fun <> freeVars arg

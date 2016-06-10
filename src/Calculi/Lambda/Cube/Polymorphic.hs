@@ -4,7 +4,7 @@ module Calculi.Lambda.Cube.Polymorphic (
       Polymorphic(..)
     , Substitution
       -- ** Notation and related functions
-    , canSubstitute
+    , hasSubstitutions
     , (⊑)
     , (\<)
     , areEquivalent
@@ -67,7 +67,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
         can be made when the first type is substituting the second.
 
         Doesn't have to be checked within this function, as subsToGraph performs
-        a significant amount of analysis that is used in `canSubstitute`'s default
+        a significant amount of analysis that is used in `hasSubstitutions`'s default
         implementation.
 
         @`substitutions` (T → G) (∀ a. (∀ b. a → b)) = Just [(T, a), (G, b)]@
@@ -214,13 +214,9 @@ generalise' = generalise Set.empty
     substitutions such as cycles or multiple possible substitutions, then return true if
     either both are identical or the substitutions don't conflict.
 -}
-canSubstitute :: forall t. Polymorphic t => t -> t -> Bool
-canSubstitute x y =
-    -- NOTE: This doesn't work as implied by it's name on @canSubstitute (a → K) (M → b)@
-    -- but it this is still valid as far as type theory (and ghci) is concerned
-    fromMaybe False (isRight . subsToGraph' <$> substitutions x y) || x == y where
-        subsToGraph' :: [(t, PolyType t)] -> Either [SubsErr Gr t (PolyType t)] (Gr t (PolyType t))
-        subsToGraph' = subsToGraph
+hasSubstitutions :: forall t. Polymorphic t => t -> t -> Bool
+hasSubstitutions x y =
+    fromMaybe False (isRight . subsToGraphGr <$> substitutions x y) || x == y
 
 {-|
     Check if two types are equivalent, where equivalence is defined as the substitutions

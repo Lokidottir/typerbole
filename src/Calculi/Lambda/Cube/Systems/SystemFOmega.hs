@@ -5,6 +5,7 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
+import           Calculi.Lambda.Cube.Systems.SimplyTyped (SimplyTyped)
 import qualified Language.Haskell.TH.Lift as TH
 import           Data.Bifoldable
 import           Data.Bifunctor.TH
@@ -95,7 +96,7 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
 
 instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
 
-    type Kind (SystemFOmega m p) = Star
+    type Kindsystem (SystemFOmega m p) = (SimplyTyped Star)
 
     kind = \case
         m@Mono{}      -> Var m
@@ -109,10 +110,6 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
         Var x                 -> Just x
         Apply x y             -> TypeAp <$> unkind x <*> unkind y
         Lambda (Poly p, _) sf -> Forall p <$> unkind sf
-        lt@Let{}              ->
-            case deepUnlet lt of
-                Let{} -> Nothing
-                sf    -> unkind sf
         _                     -> Nothing
 
     typeap = TypeAp

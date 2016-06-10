@@ -3,7 +3,7 @@
 
 -}
 module Calculi.Lambda.Cube.Typechecking (
-    -- * Typeclasses for Typechecking
+    -- * Typeclasses for Typechecking and Inference
       Typecheckable(..)
     , Inferable(..)
     -- * Error Reporting Helper Structures
