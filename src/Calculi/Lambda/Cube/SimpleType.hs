@@ -9,7 +9,9 @@ module Calculi.Lambda.Cube.SimpleType (
     , (/->)
     , order
     -- * Typechecking
-    , TypingEnvironment(..)
+    , SimpleTypingContext(..)
+    , vars
+    , allTypes
     -- * Other functions
     , prettyprintST
     , isFunction
@@ -20,6 +22,7 @@ module Calculi.Lambda.Cube.SimpleType (
 
 import           Calculi.Lambda
 import           Control.Monad
+import           Control.Lens
 import           Data.Bifoldable
 import           Data.List
 import qualified Data.Map        as Map
@@ -28,10 +31,12 @@ import           Data.Monoid
 import qualified Data.Set        as Set
 import           Test.QuickCheck
 
-data TypingEnvironment v t = TypingEnvironment {
-      vars     :: Map.Map v t
-    , allTypes :: Set.Set t
+data SimpleTypingContext v t = SimpleTypingContext {
+      _vars     :: Map.Map v t
+    , _allTypes :: Set.Set t
 } deriving (Show, Read, Eq, Ord)
+
+makeLenses ''SimpleTypingContext
 
 {-|
     Typeclass based off simply-typed lambda calculus + a method for getting all
@@ -155,5 +160,5 @@ basesOfExpr = bifoldr (\_ st -> st) (\t st -> bases t <> st) Set.empty
     Get a typing environment that assumes all the base types in an expression
     are valid.
 -}
-envFromExpr :: SimpleType t => LambdaExpr v t -> TypingEnvironment v t
-envFromExpr = TypingEnvironment Map.empty . basesOfExpr
+envFromExpr :: SimpleType t => LambdaExpr v t -> SimpleTypingContext v t
+envFromExpr = SimpleTypingContext Map.empty . basesOfExpr
