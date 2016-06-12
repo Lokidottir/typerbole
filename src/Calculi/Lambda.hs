@@ -30,7 +30,7 @@ import           Test.QuickCheck
 data LambdaExpr v t =
       Var v                                   -- ^ A reference to a variable
     | Apply (LambdaExpr v t) (LambdaExpr v t) -- ^ An application of one expression to another
-    | Lambda (v, t) (LambdaExpr v t)          -- ^ A varexpr and a function body
+    | Lambda (v, t) (LambdaExpr v t)          -- ^ A variable definition and a function body
     deriving (Eq, Ord, Show, Data)
 
 type LetDeclr v t = ((v, t), LambdaExpr v t)

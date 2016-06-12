@@ -64,4 +64,4 @@ typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
 
 typeOrderingRule :: (Polymorphic t, PolyType t ~ Integer) => t -> Bool
-typeOrderingRule t = t \< poly 900000
+typeOrderingRule t = poly 900000 \< t

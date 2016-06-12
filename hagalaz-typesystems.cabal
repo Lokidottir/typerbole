@@ -63,6 +63,7 @@ library
                      , QuasiQuotes
                      , TypeOperators
                      , MultiParamTypeClasses
+                     , FunctionalDependencies
 
 
 test-suite hagalaz-testing
