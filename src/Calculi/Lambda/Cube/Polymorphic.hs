@@ -1,9 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Calculi.Lambda.Cube.Polymorphic (
-      -- * Typeclass for Polymorphic Typesystems
+    -- * Typeclass for Polymorphic Typesystems
       Polymorphic(..)
     , Substitution
-      -- ** Notation and related functions
+    -- ** Notation and related functions
     , hasSubstitutions
     , (⊑)
     , (\<)
@@ -16,10 +17,16 @@ module Calculi.Lambda.Cube.Polymorphic (
     , typeVariables
     , boundTypeVariables
     , typeConstants
-      -- * Substitution Validation
-    , SubsErr(..)
+    -- * Substitution Validation
     , ClashTreeRoot
-      -- ** Validation related functions
+    , SubsErr(..)
+    -- ** Typechecking context
+    , SubsContext(..)
+    , SubsContext'
+    -- *** SubsContext lenses
+    , subsMade
+    , tape
+    -- ** Validation related functions
     , subsToGraph
     , subsToGraphGr
     , subsToGraphM
@@ -51,6 +58,28 @@ import qualified Control.Lens as Lens ((&))
     A type alias for substitutions, which are just endomorphisms.
 -}
 type Substitution t = t -> t
+
+{-|
+    A TypingContext
+-}
+data SubsContext t p = SubsContext {
+      _subsMade :: Map.Map p t
+    -- ^ The substitutions made so far, where the key
+    , _tape :: [p]
+    -- ^ An infinite list of polytypes not present in the who typing context.
+} deriving (Eq, Ord)
+makeLenses ''SubsContext
+
+{-|
+    Note: only shows the first 10 elements of the infinte list.
+-}
+instance (Show t, Show p) => Show (SubsContext t p) where
+    show (SubsContext s tp) = "SubsContext (" ++ show s ++ ") (" ++ show (take 10 tp) ++ ")"
+
+{-|
+    `SubsContext` but assumes the poly type representation of @t@ is the second argument.
+-}
+type SubsContext' t = SubsContext t (PolyType t)
 
 {-|
     Class of typesystems that exhibit polymorphism.
@@ -124,7 +153,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     the second.
 -}
 (⊑) :: Polymorphic t => t -> t -> Bool
-t' ⊑ t =
+t ⊑ t' =
     let
         {-
             Get all the substitutions of t' over t
