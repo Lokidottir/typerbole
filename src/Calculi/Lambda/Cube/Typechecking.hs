@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-|
     Module containing typechecking functions and data structures.
 
@@ -6,9 +7,17 @@ module Calculi.Lambda.Cube.Typechecking (
     -- * Typeclasses for Typechecking and Inference
       Typecheckable(..)
     , Inferable(..)
-    -- * Error Reporting Helper Structures
+    -- * Typing context and Type error structures
+    -- ** General use
+    , Typecheck
+    , runTypecheck
     , ErrorContext(..)
+    , expression
+    , environment
+    , errorOfContext
+    , ErrorContext'
     -- ** Simply-typed lambda calculus
+    , SimpleTypingContext(..)
     , NotKnownErr(..)
     , SimpleTypeErr(..)
     -- ** Polymorphic types
@@ -22,9 +31,12 @@ module Calculi.Lambda.Cube.Typechecking (
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Data.Bifunctor
+import           Control.Monad.State
+import           Control.Monad.Except
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.List.NonEmpty  as NE
+import           Control.Lens
 import           Data.Tree           as Tree
 
 {-|
@@ -33,16 +45,28 @@ import           Data.Tree           as Tree
     itself.
 -}
 data ErrorContext env v t err = ErrorContext {
-      expression     :: [LambdaExpr v t]
-    , environment    :: env v t
-    , errorOfContext :: err
+      _expression     :: [LambdaExpr v t]
+      -- ^ A stack of expressions leading the the expression that
+      -- caused the error as the final element.
+    , _environment    :: env
+      -- ^ The environment's state at the time of error.
+    , _errorOfContext :: err
+      -- ^ The error that occurred.
 } deriving (Eq, Ord, Show)
 
+makeLenses ''ErrorContext
+
+{-|
+    ErrorContext but the environment is assumed to be the TypingContext of @t@.
+-}
+type ErrorContext' v t err = ErrorContext (TypingContext v t) v t err
+
 instance Functor (ErrorContext env v t) where
-    fmap f errctx = errctx { errorOfContext = f (errorOfContext errctx) }
+    fmap f = errorOfContext %~ f
 
 {-|
     Name-related errors, for when there's a variable, type or constant
+    that doesn't appear in the environment that was given to the typechecker.
 -}
 data NotKnownErr v t =
       UnknownType t
@@ -71,13 +95,25 @@ data SimpleTypeErr t =
 -}
 type ClashTreeRoot t p = ([Tree (t, [p])], t)
 
+{-|
+    Typechecking type, uses the TypingContext as state and TypeError as an exception type.
+-}
+type Typecheck v t = ExceptT [TypeError v t] (State (TypingContext v t))
+
+-- | runs a Typecheck action
+runTypecheck :: st -> ExceptT e (State st) t -> Either e (st, t)
+runTypecheck env = (\(e, st) -> (,) st <$> e ) . flip runState env . runExceptT
+
+{-|
+    Errors in type variable/poly type substitution.
+-}
 data SubsErr gr t p =
       MultipleSubstitutions (ClashTreeRoot t p)
     -- ^ There are multiple possible substitutions, the first argument here
     -- is the type that has multiple substitutions and the second is the
     -- list of all the conflicting substitutions' paths.
     | CyclicSubstitution (gr t p)
-    -- ^ There is a cycle of
+    -- ^ There is a cycle of substitutions.
     deriving (Eq, Show, Read)
 
 {-|
