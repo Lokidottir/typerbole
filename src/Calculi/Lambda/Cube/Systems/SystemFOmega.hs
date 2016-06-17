@@ -56,19 +56,21 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
 
     type PolyType (SystemFOmega m p) = p
 
-    substitutions = curry $ \case
-        -- need to skip quantifiers on the left hand side
-        (Forall _ expr, target) -> substitutions expr target
-        -- Only poly types can actually be substituted, so if a poly type is
-        -- on the right hand side then the left hand side is it's substitution
-        (expr, Poly p)          -> Just [(expr, p)]
-        -- Foralls require recursing on it's type expr
-        (expr, Forall _ target) -> substitutions expr target
-        (TypeAp tl1 tr1, TypeAp tl2 tr2)
-                                -> (<>) <$> substitutions tl1 tl2 <*> substitutions tr1 tr2
-        (expr, target)
-            | expr == target -> Just []
-            | otherwise -> Nothing
+    substitutions =
+        let (<><>) :: (Semigroup s1, Semigroup s2) => Either s1 s2 -> Either s1 s2 -> Either s1 s2
+            (<><>) = curry $ \case
+                (Left a, Left b) -> Left (a <> b)
+                (a, b) -> (<>) <$> a <*> b
+        in curry $ \case
+            (Forall _ expr1    , expr2)              -> substitutions expr1 expr2
+            (expr1             , Forall _ expr2)     -> substitutions expr1 expr2
+            (Poly p1           , Poly p2)            -> Right [Mutual p1 p2]
+            (expr              , Poly p)             -> Right [Substitution expr p]
+            (Poly p            , expr)               -> Right [Substitution expr p]
+            (TypeAp arg1 ret1  , TypeAp arg2 ret2) -> substitutions arg1 arg2 <><> substitutions ret1 ret2
+            (expr1             , expr2)
+                | expr1 == expr2 -> Right []
+                | otherwise      -> Left [(expr1, expr2)]
 
     applySubstitution sub target = applySubstitution' where
         applySubstitution' = \case

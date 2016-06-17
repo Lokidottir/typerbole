@@ -9,14 +9,18 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.Typechecking
+import           Control.Monad
 import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Lens
+import           Data.Either.Combinators
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import           Data.Traversable
+import           Data.List
 import           Data.Random.Generics
 import           Data.Generics
-import           Data.Monoid
+import           Data.Semigroup
 import           Data.Maybe
 import           Data.Graph.Inductive (Gr)
 import           Test.QuickCheck
@@ -31,7 +35,21 @@ data SystemF m p =
     | Poly p
     | Function (SystemF m p) (SystemF m p)
     | Forall p (SystemF m p)
-    deriving (Eq, Ord, Show, Read, Data)
+    deriving (Eq, Ord, Data)
+
+instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
+    show (Mono m) = (show m)
+    show (Poly p) =  show p
+    show (Function a b) =
+        let astr = if isFunction a || isJust (unquantify a) then "(" ++ show a ++ ")" else show a
+        in  astr ++ " -> " ++ show b
+    show (Forall p expr) =
+        let getQuant :: SystemF m p -> ([p], SystemF m p)
+            getQuant (Forall _p _expr) = getQuant _expr & _1 %~ (_p :)
+            getQuant _expr             = ([], _expr)
+
+            (ps, _expr) = getQuant expr
+        in "forall " ++ show p ++ " " ++ unwords (show <$> ps) ++ ". " ++ show _expr
 
 deriveBifunctor ''SystemF
 deriveBifoldable ''SystemF
@@ -58,15 +76,21 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 
     type PolyType (SystemF m p) = p
 
-    substitutions = curry $ \case
-        (Forall _ expr, target) -> substitutions expr target
-        (expr, Poly p)   -> Just [(expr, p)]
-        (expr, Forall _ target) -> substitutions expr target
-        (Function fune arge, Function funt argt)
-                                -> (<>) <$> substitutions fune funt <*> substitutions arge argt
-        (expr, target)
-            | expr == target -> Just []
-            | otherwise      -> Nothing
+    substitutions =
+        let (<><>) :: (Semigroup s1, Semigroup s2) => Either s1 s2 -> Either s1 s2 -> Either s1 s2
+            (<><>) = curry $ \case
+                (Left a, Left b) -> Left (a <> b)
+                (a, b) -> (<>) <$> a <*> b
+        in curry $ \case
+            (Forall _ expr1    , expr2)              -> substitutions expr1 expr2
+            (expr1             , Forall _ expr2)     -> substitutions expr1 expr2
+            (Poly p1           , Poly p2)            -> Right [Mutual p1 p2]
+            (expr              , Poly p)             -> Right [Substitution expr p]
+            (Poly p            , expr)               -> Right [Substitution expr p]
+            (Function arg1 ret1, Function arg2 ret2) -> substitutions arg1 arg2 <><> substitutions ret1 ret2
+            (expr1             , expr2)
+                | expr1 == expr2 -> Right []
+                | otherwise      -> Left [(expr1, expr2)]
 
     applySubstitution sub target = applySubstitution' where
         applySubstitution' = \case
@@ -102,10 +126,18 @@ data SystemFErr v t =
 deriving instance (Polymorphic t, Eq v) => Eq (SystemFErr v t)
 deriving instance (Polymorphic t, Show v, Show t, Show (PolyType t)) => Show (SystemFErr v t)
 
+data SystemFContext v t p = SystemFContext {
+      _polyctx :: SubsContext t p
+      -- ^ The context for Polymorphic related information
+    , _stlcctx :: SimpleTypingContext v t
+      -- ^ The context for Simply-typed related information.
+} deriving (Eq, Ord, Show)
+
+makeLenses ''SystemFContext
+
 instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
 
-    -- Product of TypingEnvironment and SubsContext as our typing context
-    type TypingContext v (SystemF m p) = (SimpleTypingContext v (SystemF m p), SubsContext' (SystemF m p))
+    type TypingContext v (SystemF m p) = (SystemFContext v (SystemF m p) p)
 
     -- Sum of NotKnownErr, SimpleTypeErr, and SubsErr, wrapped in ErrorContext
     type TypeError v (SystemF m p) =
@@ -116,18 +148,61 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
 
     typecheck env _expr = runTypecheck env (typecheck' _expr) where
         {-
-            Using a State type to pass around our environment as parts of
+            Using a State type to pass around our environment
         -}
         typecheck' :: LambdaExpr v (SystemF m p) -> Typecheck v (SystemF m p) (SystemF m p)
         typecheck' __expr =
             -- Append the current expression to any ErrorContexts
             flip catchError (throwError . fmap (expression %~ (__expr :)))
             $ case __expr of
-                Var v ->
-                    let nameErr = get >>= (\env -> throwError [ErrorContext [] env (SFNotKnownErr (UnknownVariable v))])
-                    in do
-                        x <- (Map.lookup v <$> use (_1.vars))
-                        maybe nameErr return x
+                Var v -> do
+                    -- Query the type of the variable
+                    t <- Map.lookup v <$> use (stlcctx.vars)
+                    -- Nameerror action in case v doesn't exist within the typing context.
+                    let nameErr = do {
+                        -- Get the current environment
+                        env' <- get;
+                        -- throw the nameerror.
+                        throwError [ErrorContext [] env' (SFNotKnownErr (UnknownVariable v))];
+                    }
+                    -- If v's type (t) is Nothing then nameerror, otherwise just return it.
+                    maybe nameErr return t
+
+                Apply fun arg -> do
+                    fun'type <- typecheck' fun
+                    arg'type <- typecheck' arg
+                    -- Split fun'type into it's components
+                    (fun'from, fun'to) <- case reify fun'type of
+                        -- fun'type wasn't a function type, throw an error.
+                        Nothing -> do
+                            -- Get the environment
+                            env' <- get
+                            -- throw the type error
+                            throwError [ErrorContext [fun] env' (SFSimpleTypeErr (NotAFunction fun'type))]
+                        -- return the result
+                        Just reified -> return reified
+
+                    undefined
+
+        {-
+        x =
+            -- Check that the argument type is the same or more specific than
+            -- the type of the expected argument to fun.
+            | from ⊑ arg'type -> do
+                case substitutions arg'type from of
+                    -- There was a mismatch in structure, this needs
+                    -- to be thrown as an error.
+                    Nothing -> do
+                        env' <- get
+                        let structErrs = uncurry UnexpectedType <$> mismatchErrs arg'type from
+                        throwError $ ErrorContext [] env' . SFSimpleTypeErr <$> structErrs
+
+                    Just subs -> case applyAllSubsGr subs of
+                        Left subserrs -> do
+                            env' <- get
+                            throwError $ ErrorContext [] env' . SFSubsErr <$> subserrs
+
+                        Right applySubs -> return applySubs -}
 
 instance (Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p

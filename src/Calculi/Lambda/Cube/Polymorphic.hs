@@ -1,9 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Calculi.Lambda.Cube.Polymorphic (
     -- * Typeclass for Polymorphic Typesystems
       Polymorphic(..)
-    , Substitution
+    , Substitution(..)
     -- ** Notation and related functions
     , hasSubstitutions
     , (⊑)
@@ -14,6 +16,8 @@ module Calculi.Lambda.Cube.Polymorphic (
     , generalise
     , generalise'
     , applyAllSubs
+    , applyAllSubsGr
+    , unify
     , typeVariables
     , boundTypeVariables
     , typeConstants
@@ -40,6 +44,7 @@ import           Calculi.Lambda.Cube.Typechecking
 import           Control.Monad
 import           Control.Monad.State.Class
 import           Data.Either.Combinators
+import           Data.Bifunctor
 import           Data.Function hiding ((&))
 import           Data.Graph.Inductive as Graph
 import           Data.Graph.Inductive.Helper
@@ -55,11 +60,6 @@ import           Control.Lens as Lens hiding ((&))
 import qualified Control.Lens as Lens ((&))
 
 {-|
-    A type alias for substitutions, which are just endomorphisms.
--}
-type Substitution t = t -> t
-
-{-|
     A TypingContext
 -}
 data SubsContext t p = SubsContext {
@@ -69,6 +69,17 @@ data SubsContext t p = SubsContext {
     -- ^ An infinite list of polytypes not present in the who typing context.
 } deriving (Eq, Ord)
 makeLenses ''SubsContext
+
+{-|
+    Datatype describing possible substitutions found by the `substitutions` Polymorphic
+    typeclass method.
+-}
+data Substitution t p =
+      Mutual p p
+      -- ^ Two equivalent polytypes that could substitute eachother.
+    | Substitution t p
+      -- ^ A substitution of type expression @t@ over polytype @p@
+    deriving (Eq, Ord, Show)
 
 {-|
     Note: only shows the first 10 elements of the infinte list.
@@ -92,41 +103,88 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     type PolyType t :: *
 
     {-|
-        Generates a list of tuples representing the possible substitutions that
-        can be made when the first type is substituting the second.
+        Find the substitutions between two type expressions. If there's
+        a mismatch in structure then report the values passed as a Left
+        value.
 
-        Doesn't have to be checked within this function, as subsToGraph performs
-        a significant amount of analysis that is used in `hasSubstitutions`'s default
-        implementation.
+        ===Behaviour
 
-        @`substitutions` (T → G) (∀ a. (∀ b. a → b)) = Just [(T, a), (G, b)]@
+        * A substitution of a poly type \"a\" for mono type \"X\"
 
-        @`substitutions` (∀ a. a -> a) (∀ b. b) = Just [(a -> a, b)]@
+            @`substitutions` (X) (a) = Right [`Substitution` (X) (a)]@
+
+        * Two type expressions have substitutions between eachother.
+
+            >>> substitutions (a → B) (X → b)
+            Right [`Substitution` (X) (a), `Substitution` (B) (b)]@
+
+        * A mutual substitution between two poly types.
+
+            @`substitutions` (a) (b) = Right [`Mutual` (a) (b)]@
+
+        * Mismatches in structure.
+
+            @`substitutions` (X) (Y) = Left [(X, Y)]@
+
+            @`substitutions` (C → x C) (x C) = Left [(C → x C, x C)]@
+
     -}
-    substitutions :: t -> t -> Maybe [(t, PolyType t)]
+    substitutions :: t -> t -> Either [(t, t)] [Substitution t (PolyType t)]
 
     {-|
-        Substitution application, given one type substituting a type variable,
-        generate a function that will apply the substitution in a type expression.
+        Substitution application, given one type expression substituting a poly type and a
+        target type expression, substitute all instances of the poly type in the target
+        type expression with the type expression substituting it.
 
-        @`applySubstitution` X a (∀ a b. a → b → a) = (∀ b. X → b → X)@
+        ===Behaviour
 
-        @`applySubstitution` Y x (M x) = (M Y)@
+        * Substituting all instance of \"a\" with \"X\"
 
-        @`applySubstitution` Y x (M Q) = (M Q)@
+            @`applySubstitution` X a (∀ a b. a → b → a) = (∀ b. X → b → X)@
+
+        * Substitution application in a type expression with a type constructor.
+
+            @`applySubstitution` (X → Y) x (M x) = (M (X → Y))@
+
+        * Applying a substitution to a type expression that doesn't contain the poly type
+          being substituted
+
+            @`applySubstitution` Y x (M Q) = (M Q)@
     -}
-    applySubstitution :: t -> PolyType t -> Substitution t
+    applySubstitution :: t -> PolyType t -> t -> t
 
     {-|
-        Quantify instances of a type variable in a type expression.
+        Quantify instances of a poly type in a type expression.
 
-        @`quantify` a (a → X) = (∀ a. a → X)@
+        ===Behaviour
+
+        * Quantifying a type variable that appears in a type expression.
+
+            @`quantify` a (a → X) = (∀ a. a → X)@
+
+        * Quantifying a type variable that doesn't appear in a type expression
+
+            @`quantify` a (b → X) = (∀ a. b → X)@
     -}
     quantify :: PolyType t -> t -> t
 
     {-|
         Split a quantification into it's variable being quantified and
         the expression targeted by the quantification. A safe inverse of `quantify`.
+
+        ===Behaviour
+
+        * Unquantifying a type expression that quantifies a single poly type.
+
+            @`unquantify` (∀ a. a → b) = Just (a, a → b)@
+
+        * Unquantifying a type expression that quantifies multiple poly types
+
+            @`unquantify` (∀ a b. a b) = Just (a, ∀ b. a b)@
+
+        * Unquantifying a type expression that quantifies none of it's poly types.
+
+            @`unquantify` (A b) = Nothing@
     -}
     unquantify :: t -> Maybe (PolyType t, t)
 
@@ -140,29 +198,65 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
         Function retrives all the free type variables in a type.
         If the type is itself an unbound poly type, then that is returned.
 
-        @`freeTypeVariables` (∀ a. (∀ b. a → b → c d)) = `Set.fromList` [c, d]@
+        ===Behaviour
 
-        @`freeTypeVariables` (a → b → c) = `Set.fromList` [a, b, c]@
+        * Type expression with some of it's poly types quantified.
 
-        @`freeTypeVariables` (∀ c. X → c) = `Set.empty`@
+            @`freeTypeVariables` (∀ a b. a → b → c d)) = `Set.fromList` [c, d]@
+
+        * Type expression with no quantified poly types.
+
+            @`freeTypeVariables` (a → b → c) = `Set.fromList` [a, b, c]@
+
+        * Type expression with no unquantified poly types.
+
+            @`freeTypeVariables` (∀ c. X → c) = `Set.empty`@
     -}
     freeTypeVariables :: t -> Set.Set t
 
 {-|
-    Type ordering operator, true if the first argument is more specific or equal to
-    the second.
+    Type ordering operator, true if the second argument is more specific or equal to
+    the first.
+
+    ===Behaviour
+
+    * A type expression with poly types being ordered against one without them.
+
+        @(∀ a. a) ⊑ (X → Y) = True@
+
+    * A type expression being ordered against itself, displaying reflexivity.
+
+        @(X → X) ⊑ (X → X) = True@
+
+    * All type expressions are more specific than a type expression
+      of just a single (bound or unbound) poly type.
+
+        @(a) ⊑ (a) = True@
+
+        @(a) ⊑ (b) = True@
+
+        @(a) ⊑ (X) = True@
+
+        @(a) ⊑ (X → Y) = True@
+
+        etc.
+
 -}
 (⊑) :: Polymorphic t => t -> t -> Bool
 t ⊑ t' =
     let
+        convertMutual (Mutual b a) = (poly a,  b)
+        convertMutual (Substitution a b) = (a,  b)
+
         {-
-            Get all the substitutions of t' over t
+            Get all the substitutions of t' over t, and map the substitution mismatches
+            with the SubsMismatch error constructor.
         -}
-        subs = substitutions t' t
+        subs = fmap (uncurry SubsMismatch) `first` substitutions t' t
         {-
             Assuming getting the substitutions succeeded, validate and apply them together.
         -}
-        appedSubs = applyAllSubsGr (fromMaybe [] subs)
+        appedSubs = fmap convertMutual <$> subs >>= applyAllSubsGr
         {-
             Assuming the substitutions were valid, pull the substitution function out of
             Either, using the identity function in case of a Left value.
@@ -170,7 +264,7 @@ t ⊑ t' =
         appedSubs' = fromRight id appedSubs
         -- Assuming the substitutions succeeded and were valid, check that t' is equal to the
         -- substitutions it implies for t being applied to t.
-    in isJust subs && isRight appedSubs && t' ≣ appedSubs' t
+    in isRight appedSubs && t' ≣ appedSubs' t
 
 infix 4 ⊑
 
@@ -202,7 +296,7 @@ infixr 6 \-/
     All the type variables in a type expression, bound or unbound.
 -}
 typeVariables :: Polymorphic t => t -> Set.Set t
-typeVariables t = Set.fromList $ poly . snd <$> fromMaybe [] (substitutions t t)
+typeVariables t = Set.fromList . concatMap (\(Mutual a b) -> poly <$> [a, b]) $ fromRight [] (substitutions t t)
 
 {-|
     Bound type variables of an expression.
@@ -220,9 +314,9 @@ typeConstants t = Set.difference (bases t) (typeVariables t)
     Quantify every free type variable in a type expression, excluding a
     set of free type variables to not quantify.
 
-    @`generalise` Set.empty (x → y) = (∀ x y. x → y) @
+    @`generalise` `Set.empty` (x → y) = (∀ x y. x → y)@
 
-    @`generalise` (Set.fromList [a, b]) (a → b → c) = (∀ c. a → b → c) @
+    @`generalise` (`Set.fromList` [a, b]) (a → b → c) = (∀ c. a → b → c) @
 -}
 generalise :: forall t. Polymorphic t => Set.Set t -> t -> t
 generalise exclude t = foldr quantify t ftvsBare where
@@ -230,7 +324,7 @@ generalise exclude t = foldr quantify t ftvsBare where
     ftvsBare = Set.fromList $ snd <$> filter (flip Set.member ftvs . fst) polyTypes where
         ftvs = Set.difference (freeTypeVariables t) exclude
         polyTypes :: [(t, PolyType t)]
-        polyTypes = fromMaybe [] $ substitutions t t
+        polyTypes = fmap (\(Mutual a b) -> (poly a, b)) . fromRight [] $ substitutions t t
 
 {-|
     `generalise` but with an empty exclusion set.
@@ -239,18 +333,70 @@ generalise' :: Polymorphic t => t -> t
 generalise' = generalise Set.empty
 
 {-|
+    Unify two type expressions.
+-}
+unify :: forall gr t p. (Polymorphic t, DynGraph gr, PolyType t ~ p)
+      => [p]          -- ^ An infinite list of type variables that don't exist in either type expressions
+                      -- or a greater typing context.
+      -> t            -- ^ The first type expression.
+      -> t            -- ^ The second type expression.
+      -> Either [SubsErr gr t p] (Unification t p)
+                      -- ^ The result, either substitution errors or a tuple of the remaining
+                      -- poly types in the infinte list and the
+unify tape t1 t2 = do
+    -- Get the substitutions, turn any mismatches into SubsErrs.
+    subs <- fmap (uncurry SubsMismatch) `first` substitutions t1 t2
+    let (tapeRemainder, subs') = resolveMutuals tape subs
+    validSubs <- topsortSubs subs'
+    return (tapeRemainder, validSubs) where
+        {-
+            With an infinite tape, turn all `Mutual` substitutions into
+            substitutions of the form (t, p), consuming poly types from
+            the infinite list when they're needed to solve mutual substitutions.
+
+            NOTE: May need to rethink how Mutual is structured, there's a massive chance that
+                  that the structure may lead to cycles or clashes that are entirely
+                  composed of poly types that could be solved with a version of this
+                  that tackles mutual substitution of any number of poly types.
+
+                  tl;dr: make Mutual have a list of mutuals instead, put the burden of checking
+                         this put on the implementer of the typesystems.
+        -}
+        resolveMutuals :: [p] -> [Substitution t p] -> ([p], [(t, p)])
+        resolveMutuals _tape = foldl resolveSingle (_tape, []) where
+            {-
+                When encountering a Mutual, consume a poly type from
+                the infinte list, otherwise just convert the substitution
+                into a tuple and pass the list on.
+            -}
+            resolveSingle :: ([p], [(t, p)])
+                          -> Substitution t p
+                          -> ([p], [(t, p)])
+            resolveSingle (h : tl, subs) (Mutual p1 p2)            = (tl , (poly h, p1) : (poly h, p2) : subs)
+            resolveSingle (_tape, subs) (Substitution expr target) = (_tape , (expr, target) : subs)
+
+{-|
+    A type alias triple, where the first element is the remaining infinite
+    list of type variables, the second is the ones that were consumed
+-}
+type Unification t p = ([p], [(t, p)])
+
+{-|
     Calculate if one type can substitute another, should check if there are any error in the
     substitutions such as cycles or multiple possible substitutions, then return true if
     either both are identical or the substitutions don't conflict.
 -}
 hasSubstitutions :: forall t. Polymorphic t => t -> t -> Bool
-hasSubstitutions x y =
-    fromMaybe False (isRight . subsToGraphGr <$> substitutions x y) || x == y
+hasSubstitutions x y = isRight (applyAllSubsGr =<< processSubs (substitutions x y)) where
+    processSubs = bimap (uncurry SubsMismatch <$>) (catMaybes . fmap convertMutual) where
+        convertMutual (Substitution t1 t2) = Just (t1, t2)
+        convertMutual (Mutual t1 t2) = Just (poly t1, t2)
+
 
 {-|
     Check if two types are equivalent, where equivalence is defined as the substitutions
     being made being symbolically identical, where binds and type variables appear in
-    the same place but may have different names.
+    the same place but may have different names (this is Alpha Equivalence).
 
     @`areEquivalent` (∀ a. X → a) (∀ z. X → z) = True@
 
@@ -259,11 +405,11 @@ hasSubstitutions x y =
     @`areEquivalent` (∀ a. a) (∀ z. z → z) = False@
 -}
 areEquivalent :: forall t. Polymorphic t => t -> t -> Bool
-areEquivalent x y = fromMaybe (x == y) $ do
-    subs1 <- nubSort . mapPoly <$> substitutions x y -- get the sorted substitutions of the first
-    subs2 <- nubSort . fmap swap . mapPoly <$> substitutions y x -- get the sorted substitutions of the second
-    return (subs1 == subs2) where
-        mapPoly = fmap (_2 %~ (poly :: PolyType t -> t))
+areEquivalent x y = fromRight False $ all isMutual <$> subs where
+    subs = substitutions x y
+
+    isMutual (Mutual _ _) = True
+    isMutual _            = False
 
 {-|
     For a given list of substitutions, either find and report inconsistencies
@@ -293,16 +439,16 @@ topsortSubsG = unvalidatedEdgeyTopsort
     Without validating if the substitutions are consistent, fold them into a single
     function that applies all substitutions to a given type expression.
 -}
-unvalidatedApplyAllSubs :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> Substitution t
+unvalidatedApplyAllSubs :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> t -> t
 unvalidatedApplyAllSubs = foldr (\sub f -> uncurry applySubstitution sub . f) id
 
 {-|
     Validate substitutions and fold them into a single substitution function.
 -}
-applyAllSubs :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr) => [(t, p)] -> Either [SubsErr gr t p] (Substitution t)
+applyAllSubs :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr) => [(t, p)] -> Either [SubsErr gr t p] (t -> t)
 applyAllSubs = fmap unvalidatedApplyAllSubs . topsortSubs
 
-applyAllSubsGr :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> Either [SubsErr Gr t p] (Substitution t)
+applyAllSubsGr :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> Either [SubsErr Gr t p] (t -> t)
 applyAllSubsGr = applyAllSubs
 
 {-|
