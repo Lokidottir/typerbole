@@ -114,8 +114,8 @@ sfexpr :: LCParsec StringSF
 sfexpr = label "System-F expression" $
           quant sfexpr
       <|> exprsequence (poly <$> variable
-                           <|> mono <$> variable
-                           <|> paren sfexpr)
+                    <|> mono <$> constant
+                    <|> paren sfexpr)
 
 stlcexpr :: LCParsec StringSTLC
 stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|> paren stlcexpr)
@@ -124,7 +124,7 @@ stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|>
 {-|
     A QuasiQuoter for SystemFOmega, allowing arbitrary type application
 
-    @[sfo| forall x. R x -> M x |] == quantify \"x\" (mono \"R\" /$ poly \"x\" /-> Mono \"M\" /$ poly \"x\")@
+    @[sfo| forall x. R x -> M x |] == quantify \"x\" (mono \"R\" /$ poly \"x\" /-> mono \"M\" /$ poly \"x\")@
 -}
 sfo :: TH.QuasiQuoter
 sfo = mkqq "sfo" sfoexpr

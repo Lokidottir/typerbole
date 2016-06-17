@@ -114,6 +114,9 @@ data SubsErr gr t p =
     -- list of all the conflicting substitutions' paths.
     | CyclicSubstitution (gr t p)
     -- ^ There is a cycle of substitutions.
+    | SubsMismatch t t
+    -- ^ A substitution between two incompatable type expressions
+    -- was attempted. (i.e. @`substitutions` (X) (Y → Y)@)
     deriving (Eq, Show, Read)
 
 {-|

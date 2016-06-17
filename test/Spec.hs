@@ -1,16 +1,27 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube
+import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.Systems.SimplyTyped  as ST
 import           Calculi.Lambda.Cube.Systems.SystemF      as SF
 import           Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
 import           Data.Maybe
+import           Data.Generics
+import           Data.Semigroup
+import           Control.Arrow hiding (first, second)
+import           Data.Either.Combinators
+import           Data.Bifunctor
+import           Debug.Trace
+import qualified Data.Set as Set
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 
 main :: IO ()
-main = hspec $ do
+main = hspec $
         describe "Type systems follow laws and properties" $ do
             describe "SimplyTyped" $
                 followsSimpleType (arbitrary :: Gen SimplyTyped')
@@ -22,34 +33,42 @@ main = hspec $ do
                 followsPolymorphic (arbitrary :: Gen SystemFOmega')
                 followsHigherOrder (arbitrary :: Gen SystemFOmega')
 
-type SimplyTyped' = SimplyTyped Integer
-type SystemFOmega' = SystemFOmega Integer Integer
-type SystemF' = SF.SystemF Integer Integer
+type SimplyTyped' = SimplyTyped AlphabetUpper
+type SystemFOmega' = SystemFOmega AlphabetUpper AlphabetLow
+type SystemF' = SF.SystemF AlphabetUpper AlphabetLow
 
 followsSimpleType :: forall t. (SimpleType t, Show t, Arbitrary t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $
     prop "follows abstract-reify inverse law" $ (abstractInverse :: t -> t -> Bool)
 
-followsPolymorphic :: forall t. (Polymorphic t, Show t, Arbitrary t, PolyType t ~ Integer) => Gen t -> Spec
+followsPolymorphic :: forall t.
+                      (
+                        Polymorphic t
+                      , Show t
+                      , Arbitrary t
+                      , Arbitrary (PolyType t)
+                      , Show (PolyType t)
+                      , Enum (PolyType t)
+                      )
+                   => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
-    prop "equivalence is reflexive" $
-        ((\ ty -> ty ≣ ty) :: t -> Bool)
-    prop "substitution is reflexive" $
-        ((\ ty -> ty `hasSubstitutions` ty) :: t -> Bool)
-    prop "follows quantify-unquantify inverse law" $ (quantifyInverse :: Integer -> t -> Bool)
-    prop "follows type-ordering rule 1" (typeOrderingRule :: t -> Bool)
+    prop "equivalence is reflexive"
+        ((\ !ty -> ty ≣ ty) :: t -> Bool)
+    prop "substitution is reflexive"
+        ((\ !ty -> ty `hasSubstitutions` ty) :: t -> Bool)
+    prop "follows quantify-unquantify inverse law"
+        (quantifyInverse :: (PolyType t) -> t -> Bool)
+    prop "follows type-ordering rule 1"
+        (typeOrderingRule :: t -> Bool)
+    modifyMaxSuccess (const 1000) . prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
+        forAll (arbitrary `suchThat` unifyR1Predicate)
+            (uncurry unifyR1 :: ((t, t) -> Bool))
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
     prop "follows kind-unkind inverse law" $
-        ((\ty -> unkind (kind ty) == Just ty) :: t -> Bool)
+        ((\ !ty -> unkind (kind ty) == Just ty) :: t -> Bool)
     prop "follows typeap-untypeap inverse law" $ (typeapInverse ::  t -> t -> Bool)
-
-{-|
-    An expression of type "(0 -> 5) -> 0 -> 5"
--}
-expr1 :: LambdaExpr Integer (SimplyTyped Integer)
-expr1 = Lambda (1, ST.Mono 0 /-> ST.Mono 5) (Lambda (2, ST.Mono 0) (Var 1 `Apply` Var 2))
 
 {-|
     Check that `reify` is the inverse (within a Maybe) of `abstract`.
@@ -57,11 +76,54 @@ expr1 = Lambda (1, ST.Mono 0 /-> ST.Mono 5) (Lambda (2, ST.Mono 0) (Var 1 `Apply
 abstractInverse :: (SimpleType t) => t -> t -> Bool
 abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
 
-quantifyInverse :: (Polymorphic t, PolyType t ~ Integer) => Integer -> t -> Bool
-quantifyInverse !ta !tb = fmap (uncurry quantify) (unquantify (quantify ta tb)) == Just (quantify ta tb)
+quantifyInverse :: (Polymorphic t) => PolyType t -> t -> Bool
+quantifyInverse !ta !tb =
+    fmap (uncurry quantify) (unquantify (quantify ta tb)) == Just (quantify ta tb)
 
 typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
 
-typeOrderingRule :: (Polymorphic t, PolyType t ~ Integer) => t -> Bool
-typeOrderingRule t = poly 900000 \< t
+typeOrderingRule :: (Enum e, Polymorphic t, PolyType t ~ e) => t -> Bool
+typeOrderingRule !t = poly (toEnum 900000) \< t
+
+unifyR1 :: forall t e. (Enum e, Polymorphic t, Show t, PolyType t ~ e) => t -> t -> Bool
+unifyR1 !t1 !t2 =
+    -- If the unification returns errors, then return true as
+    -- this rule is checking the property itself, not the substitution errors.
+    fromRight True $ do
+        u <- snd <$> unify (enumFrom (toEnum 1000)) t1 t2 >>= applyAllSubsGr
+        return (u t1 ≣ u t2)
+
+{-
+    The input predicate for unifyR1; the type variables in each expression
+    must be disjoint and there must be valid substitutions between the two expressions.
+-}
+unifyR1Predicate (t1, t2) = typeVariables t1 `disjoint` typeVariables t2 && hasSubstitutions t1 t2
+
+disjoint a b = Set.difference a b == a
+
+newtype AlphabetLow = AlphabetLow Integer deriving (Eq, Ord, Enum, Data, Typeable)
+
+instance Arbitrary AlphabetLow where
+    arbitrary = AlphabetLow <$> elements [0..35]
+
+instance Show AlphabetLow where
+    show (AlphabetLow n) = char : if suffix == 0 then "" else show suffix where
+        suffix = (n - charNum) `div` 36
+
+        charNum = n `mod` 36
+
+        char = (cycle ['a'..'z']) !! fromEnum charNum
+
+newtype AlphabetUpper = AlphabetUpper Integer deriving (Eq, Ord, Enum, Data, Typeable)
+
+instance Arbitrary AlphabetUpper where
+    arbitrary = AlphabetUpper <$> elements [0..35]
+
+instance Show AlphabetUpper where
+    show (AlphabetUpper n) = char : if suffix == 0 then "" else show suffix where
+        suffix = (n - charNum) `div` 36
+
+        charNum = n `mod` 36
+
+        char = (cycle ['A'..'Z']) !! fromEnum charNum
