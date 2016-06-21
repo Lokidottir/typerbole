@@ -12,6 +12,7 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
     , hasSubstitutions
     , applyAllSubs
     , applyAllSubsGr
+    , resolveMutuals
     -- * Unification type
     , Unify(..)
     , runUnify
@@ -125,18 +126,17 @@ hasSubstitutions t1 t2 =
 -}
 resolveMutuals :: forall t p. (Polymorphic t, p ~ PolyType t) => [Substitution t p] -> Unify t p [(t, p)]
 resolveMutuals subs = do
-    let (mutuals, subs') = partitionSubstitutions subs
-    subs'' <- nubSort . (++ subs') . concat <$> mutuals `forM` \(p1, p2) -> do
-        var <- poly <$> newPolyType
-        return [(var, p1), (var, p2)]
-    {-subs''' <- do
-        let mutuals' = concatMap (\(a, b) -> [a, b]) mutuals
-        let mutualsEdges = (\(a, b) -> (a, b, ())) <$> mutuals
-        sgraph :: (Gr p ()) <- return . Graph.run_ Graph.empty $ do
-            insMapNodesM mutuals'
-            insMapEdgesM mutualsEdges
-        undefined-}
-    return subs''
+    let (mutuals, subs') = filter (uncurry (/=)) `first` partitionSubstitutions subs
+    -- As a mutual substitution (a,b) means that a is b, every substitution
+    -- of the form (T, a) must be duplicated to include (T, b), and every
+    -- substitution of the form (M, b) must be duplicated to include (M, a).
+    return (foldr expandMutual subs' mutuals) where
+        expandMutual :: (p, p) -> [(t, p)] -> [(t, p)]
+        expandMutual (a, b) _subs = do
+            -- Get the single substitution
+            sub@(term, var) <- _subs
+            -- if either a or b are equal to var then
+            if a == var || b == var then [(term, a), (term, b)] else return sub
 
 {-|
     Type ordering operator, true if the second argument is more specific or equal to
@@ -176,6 +176,9 @@ t ⊑ t' = gets $ \st -> fromRight False . runUnify' st $ do
 
 infix 4 ⊑
 
+{-|
+    Non-unicode @⊑@.
+-}
 (\<) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Unify t p Bool
 (\<) = (⊑)
 
@@ -330,7 +333,7 @@ substitutionGraphM subs = do
     edges represent the origin node replacing the variable represented by the edge label
     in the target node.
 
-    e.g. The edge @(N, (x -> x), x)@ corresponds to replacing all instances of the variable @x@ in 
+    e.g. The edge @(N, (x -> x), x)@ corresponds to replacing all instances of the variable @x@ in
     @(x -> x)@ with @N@.
 -}
 occursCheck :: forall gr t p. (DynGraph gr, Ord p, Ord t) => gr t p -> [SubsErr gr t p]
