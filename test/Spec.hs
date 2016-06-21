@@ -5,6 +5,7 @@
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube
 import           Calculi.Lambda.Cube.Polymorphic
+import           Calculi.Lambda.Cube.Polymorphic.Unification
 import           Calculi.Lambda.Cube.Systems.SimplyTyped  as ST
 import           Calculi.Lambda.Cube.Systems.SystemF      as SF
 import           Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
@@ -54,14 +55,12 @@ followsPolymorphic :: forall t.
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "equivalence is reflexive"
         ((\ !ty -> ty ≣ ty) :: t -> Bool)
-    prop "substitution is reflexive"
-        ((\ !ty -> ty `hasSubstitutions` ty) :: t -> Bool)
     prop "follows quantify-unquantify inverse law"
         (quantifyInverse :: (PolyType t) -> t -> Bool)
     prop "follows type-ordering rule 1"
         (typeOrderingRule :: t -> Bool)
     modifyMaxSuccess (const 1000) . prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
-        forAll (arbitrary `suchThat` unifyR1Predicate)
+        forAll(arbitrary `suchThat` unifyR1Predicate)
             (uncurry unifyR1 :: ((t, t) -> Bool))
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
@@ -84,21 +83,32 @@ typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
 
 typeOrderingRule :: (Enum e, Polymorphic t, PolyType t ~ e) => t -> Bool
-typeOrderingRule !t = poly (toEnum 900000) \< t
+typeOrderingRule !t =
+    fromRight False . runUnify' (UnifyState $ enumFrom (toEnum 10000)) $ (poly (toEnum 9999) ⊑ t)
 
 unifyR1 :: forall t e. (Enum e, Polymorphic t, Show t, PolyType t ~ e) => t -> t -> Bool
 unifyR1 !t1 !t2 =
     -- If the unification returns errors, then return true as
     -- this rule is checking the property itself, not the substitution errors.
-    fromRight True $ do
-        u <- snd <$> unify (enumFrom (toEnum 1000)) t1 t2 >>= applyAllSubsGr
+    fromRight True . runUnify' (UnifyState $ enumFrom (toEnum 9000)) $ do
+        subs <- unify t1 t2
+        u <- eitherToError (applyAllSubsGr subs)
         return (u t1 ≣ u t2)
 
 {-
     The input predicate for unifyR1; the type variables in each expression
     must be disjoint and there must be valid substitutions between the two expressions.
 -}
-unifyR1Predicate (t1, t2) = typeVariables t1 `disjoint` typeVariables t2 && hasSubstitutions t1 t2
+unifyR1Predicate (t1, t2) =
+    t1'tvs `disjoint` t2'tvs && hasSubstitutions' where
+        hasSubstitutions' = fromRight False . runUnify' ustate $ hasSubstitutions t1 t2
+
+        ustate = UnifyState (filter (flip Set.notMember alltvs . poly) (toEnum <$> [0..]))
+
+        alltvs = t1'tvs <> t2'tvs
+
+        t1'tvs = typeVariables t1
+        t2'tvs = typeVariables t2
 
 disjoint a b = Set.difference a b == a
 
@@ -108,12 +118,13 @@ instance Arbitrary AlphabetLow where
     arbitrary = AlphabetLow <$> elements [0..35]
 
 instance Show AlphabetLow where
-    show (AlphabetLow n) = char : if suffix == 0 then "" else show suffix where
-        suffix = (n - charNum) `div` 36
+    show (AlphabetLow n) = char : if suffix == 0 then
+        "" else show suffix where
+            suffix = (n - charNum) `div` 36
 
-        charNum = n `mod` 36
+            charNum = n `mod` 36
 
-        char = (cycle ['a'..'z']) !! fromEnum charNum
+            char = (cycle ['a'..'z']) !! fromEnum charNum
 
 newtype AlphabetUpper = AlphabetUpper Integer deriving (Eq, Ord, Enum, Data, Typeable)
 
@@ -121,7 +132,7 @@ instance Arbitrary AlphabetUpper where
     arbitrary = AlphabetUpper <$> elements [0..35]
 
 instance Show AlphabetUpper where
-    show (AlphabetUpper n) = char : if suffix == 0 then "" else show suffix where
+    show (AlphabetUpper n) = char : if suffix == 0 then "" else (show suffix) where
         suffix = (n - charNum) `div` 36
 
         charNum = n `mod` 36

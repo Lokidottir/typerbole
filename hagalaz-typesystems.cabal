@@ -22,6 +22,7 @@ library
                      , Calculi.Lambda.Cube
                      , Calculi.Lambda.Cube.SimpleType
                      , Calculi.Lambda.Cube.Polymorphic
+                     , Calculi.Lambda.Cube.Polymorphic.Unification
                      , Calculi.Lambda.Cube.HigherOrder
                      , Calculi.Lambda.Cube.Dependent
                      , Calculi.Lambda.Cube.Typechecking
