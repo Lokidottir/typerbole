@@ -60,8 +60,11 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
     prop "follows type-ordering rule 1"
         (typeOrderingRule :: t -> Bool)
     prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
-        forAll(arbitrary `suchThat` unifyR1Predicate)
+        forAll (arbitrary `suchThat` unifyR1Predicate)
             (uncurry unifyR1 :: ((t, t) -> Bool))
+    prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
+        forAll (arbitrary `suchThat` unifyR1Predicate)
+            (uncurry unifyR2 :: ((t, t) -> Bool))
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
@@ -94,6 +97,14 @@ unifyR1 !t1 !t2 =
         subs <- unify t1 t2
         u <- eitherToError (applyAllSubsGr subs)
         return (u t1 ≣ u t2)
+
+unifyR2 !t1 !t2 =
+    fromRight True . runUnify' (UnifyState $ enumFrom (toEnum 9000)) $ do
+        subs <- unify t1 t2
+        u <- eitherToError (applyAllSubsGr subs)
+        return $
+            (freeTypeVariables (u t1) <> freeTypeVariables (u t2))
+            `Set.isSubsetOf` (freeTypeVariables t1 <> freeTypeVariables t2)
 
 {-
     The input predicate for unifyR1; the type variables in each expression
