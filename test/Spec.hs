@@ -22,7 +22,7 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 
 main :: IO ()
-main = hspec $
+main = hspec . parallel $
         describe "Type systems follow laws and properties" $ do
             describe "SimplyTyped" $
                 followsSimpleType (arbitrary :: Gen SimplyTyped')
@@ -59,7 +59,7 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (quantifyInverse :: (PolyType t) -> t -> Bool)
     prop "follows type-ordering rule 1"
         (typeOrderingRule :: t -> Bool)
-    modifyMaxSuccess (const 1000) . prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
+    prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
         forAll(arbitrary `suchThat` unifyR1Predicate)
             (uncurry unifyR1 :: ((t, t) -> Bool))
 
