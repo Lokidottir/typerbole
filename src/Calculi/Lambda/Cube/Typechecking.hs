@@ -22,7 +22,7 @@ module Calculi.Lambda.Cube.Typechecking (
     , SimpleTypeErr(..)
     -- ** Polymorphic types
     , SubsErr(..)
-    , ClashTreeRoot
+    , ConflictTree
     -- * Type Helpers
     , (:+:)
 ) where
@@ -93,7 +93,7 @@ data SimpleTypeErr t =
     because of their convergence the first layer of the trees should
     all be substituting the same variable.
 -}
-type ClashTreeRoot t p = ([Tree (t, [p])], t)
+type ConflictTree t p = ([Tree (t, [p])], t)
 
 {-|
     Typechecking type, uses the TypingContext as state and TypeError as an exception type.
@@ -108,7 +108,7 @@ runTypecheck env = (\(e, st) -> (,) st <$> e ) . flip runState env . runExceptT
     Errors in type variable/poly type substitution.
 -}
 data SubsErr gr t p =
-      MultipleSubstitutions (ClashTreeRoot t p)
+      MultipleSubstitutions (ConflictTree t p)
     -- ^ There are multiple possible substitutions, the first argument here
     -- is the type that has multiple substitutions and the second is the
     -- list of all the conflicting substitutions' paths.

@@ -25,23 +25,24 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
     , substitutionGraph
     , substitutionGraphGr
     , substitutionGraphM
-
+    , occursCheck
+    , conflicts
 ) where
 
 import           Calculi.Lambda.Cube.Polymorphic
 import           Control.Applicative hiding (empty)
-import           Control.Lens as Lens hiding ((&))
-import qualified Control.Lens as Lens ((&))
+import           Control.Lens as Lens
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Bifunctor
 import           Data.Either.Combinators
 import           Data.Either (partitionEithers)
-import           Data.Graph.Inductive as Graph
+import           Data.Graph.Inductive as Graph hiding ((&))
 import           Data.Graph.Inductive.Helper
+import           Data.Function (on)
 import           Data.List.Ordered
-import           Data.List (groupBy, partition)
+import           Data.List (groupBy, group, partition)
 import           Data.Maybe
 import qualified Data.Set                       as Set
 import           Data.Tree
@@ -317,7 +318,7 @@ substitutionGraphM subs = do
     -- Insert the edges.
     insMapEdgesM (catMaybes subsEdges)
     -- Compute and return the errors
-    occursCheck <$> gets snd where
+    gets (occursCheck . snd) where
         {-
             Given a substitution pair and pair of a type expression and it's
             base types, check if the substitution's own target appears in those
@@ -349,71 +350,26 @@ occursCheck graph =
         {-
             Generate a list of trees of fully labelled edges,
         -}
-        clashesOfGraph :: gr t p -> [ClashTreeRoot t p]
-        clashesOfGraph graph = concatMap findClashRootPaths candidates where
+        clashesOfGraph :: gr t p -> [ConflictTree t p]
+        clashesOfGraph graph =
+            uncurry (branchConflicts graph) <$> conflicts graph
 
-            {-
-                Group by equality on the first element (edge label) and inequality on the second.
-            -}
-            groupByEdgelabel :: (Eq a, Eq b) => [(a, b)] -> [[(a, b)]]
-            groupByEdgelabel = groupBy (\(a, b) (a', b') -> a == a' && b /= b')
+{-|
+    Find all contexts with non-unique inward labels.
+-}
+conflicts :: (DynGraph gr, Ord p, Ord t) => gr t p -> [(p, Graph.Context t p)]
+conflicts graph = do
+    -- For each node in the graph...
+    node <- nodes graph
+    --Find it's inward edges and group them by label, filtering any label that appears once.
+    conflict <- nub =<< filter hasSome (group (inn graph node <&> (^._3)))
+    return (conflict, context graph node)
 
-            {-
-                List of contexts that fit `selector`'s predicate.
-            -}
-            candidates = gsel selector graph
-
-
-            {-
-                Evaluate to true on any node with inward edges that do not have completely
-                unique labels, as this means there's two or more substitutions being attempted
-                on the same type variable.
-            -}
-            selector (inward, _, _, _) = any hasSome $ groupByEdgelabel inward
-
-            {-
-                Get the clash root paths for an individual context. These get
-                concatinated to a list for all the contexts.
-            -}
-            findClashRootPaths :: Graph.Context t p -> [ClashTreeRoot t p]
-            findClashRootPaths ctx = buildClashRootPaths <$> ctxGroups where
-                {-
-                    Contexts grouped by their edge labels towards ctx, all groups with <2 elements
-                    have been filtered out due clashes being defined as there being two or more inward
-                    edges with the same label.
-                -}
-                ctxGroups =
-                    fmap (context graph . (^._2)) <$> filter hasSome (groupByEdgelabel (ctx^._1))
-
-                {-
-                    Build the clash root path for an individual group.
-                -}
-                buildClashRootPaths :: [Graph.Context t p] -> ClashTreeRoot t p
-                buildClashRootPaths ctxs = (paths, lab' ctx) where
-                    {-
-                        The original context but with it's inward edges that aren't in
-                        the provided group removed.
-                    -}
-                    ctx' :: Graph.Context t p
-                    ctx' = ctx Lens.& _1 %~ filter ((`Set.member` ctxsNodeSet) . snd)
-
-                    {-
-                        Set of all nodes labels of the group.
-                    -}
-                    ctxsNodeSet = Set.fromList $ node' <$> ctxs
-
-                    {-
-                        All the paths leading to the final context.
-                    -}
-                    paths :: [Tree (t, [p])]
-                    paths = fmap fst <$> (treeRootStatefulBy statef ctx' graph <$> ctxs) where
-                        {-
-                            Function that given a previous context and a current context,
-                            builds a tuple of the current context's label and the labels of
-                            all edges from the current context to the previous context.
-                        -}
-                        statef :: Graph.Context t p -> Graph.Context t p -> ((t, [p]), Graph.Context t p)
-                        statef ctxPre ctxCurr = ((lab' ctxCurr, subbed), ctxCurr) where
-                            -- The list of all type variables in the previous context substituted
-                            -- by the label of the current context
-                            subbed = fst <$> filter ((== node' ctxPre) . snd) (ctxCurr^._4)
+branchConflicts :: (DynGraph gr, Ord p, Ord t) => gr t p -> p -> Graph.Context t p -> ([Tree (t, [p])], t)
+branchConflicts graph lbl ctx@(_,nn,nl,_) = flip (,) nl $ do
+    let inward = filter ((== lbl) . (^._3)) (inn graph nn)
+    tree <- rdffWith id ((^._1) <$> inward) graph
+    return $ processTree ctx tree where
+        processTree :: Graph.Context t p -> Tree (Graph.Context t p) -> Tree (t, [p])
+        processTree pctx (Node ctx forest) =
+            Node (lab' ctx, fst <$> filter ((== node' pctx) . snd) (ctx^._4)) (processTree ctx <$> forest)

@@ -59,12 +59,13 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (quantifyInverse :: (PolyType t) -> t -> Bool)
     prop "follows type-ordering rule 1"
         (typeOrderingRule :: t -> Bool)
-    prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
-        forAll (arbitrary `suchThat` unifyR1Predicate)
-            (uncurry unifyR1 :: ((t, t) -> Bool))
-    prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
-        forAll (arbitrary `suchThat` unifyR1Predicate)
-            (uncurry unifyR2 :: ((t, t) -> Bool))
+    modifyMaxSuccess (* 20) $ describe "Unification rules (x 20 number of tests)" $ do
+        prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
+            forAll (arbitrary `suchThat` unifyR1Predicate)
+                (uncurry unifyR1 :: ((t, t) -> Bool))
+        prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
+            forAll (arbitrary `suchThat` unifyR1Predicate)
+                (uncurry unifyR2 :: ((t, t) -> Bool))
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do

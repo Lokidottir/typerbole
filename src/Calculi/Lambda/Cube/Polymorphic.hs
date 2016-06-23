@@ -17,7 +17,7 @@ module Calculi.Lambda.Cube.Polymorphic (
     , typeConstants
     , isPolyType
     -- * Substitution Validation
-    , ClashTreeRoot
+    , ConflictTree
     , SubsErr(..)
     -- ** Typechecking context
     , SubsContext(..)
@@ -104,7 +104,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
             >>> substitutions (X) (Y)
             Left [(X, Y)]
 
-            >>> substitutions (C → x C) (x C) 
+            >>> substitutions (C → x C) (x C)
             Left [(C → x C, x C)]
 
     -}
