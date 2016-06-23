@@ -87,22 +87,21 @@ typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
 
 typeOrderingRule :: (Enum e, Polymorphic t, PolyType t ~ e) => t -> Bool
-typeOrderingRule !t =
-    fromRight False . runUnify' (UnifyState $ enumFrom (toEnum 10000)) $ (poly (toEnum 9999) ⊑ t)
+typeOrderingRule !t = poly (toEnum 9999) ⊑ t
 
 unifyR1 :: forall t e. (Enum e, Polymorphic t, Show t, PolyType t ~ e) => t -> t -> Bool
 unifyR1 !t1 !t2 =
     -- If the unification returns errors, then return true as
     -- this rule is checking the property itself, not the substitution errors.
-    fromRight True . runUnify' (UnifyState $ enumFrom (toEnum 9000)) $ do
+    fromRight True $ do
         subs <- unify t1 t2
-        u <- eitherToError (applyAllSubsGr subs)
+        u <- applyAllSubsGr subs
         return (u t1 ≣ u t2)
 
 unifyR2 !t1 !t2 =
-    fromRight True . runUnify' (UnifyState $ enumFrom (toEnum 9000)) $ do
+    fromRight True $ do
         subs <- unify t1 t2
-        u <- eitherToError (applyAllSubsGr subs)
+        u <- applyAllSubsGr subs
         return $
             (freeTypeVariables (u t1) <> freeTypeVariables (u t2))
             `Set.isSubsetOf` (freeTypeVariables t1 <> freeTypeVariables t2)
@@ -112,10 +111,7 @@ unifyR2 !t1 !t2 =
     must be disjoint and there must be valid substitutions between the two expressions.
 -}
 unifyR1Predicate (t1, t2) =
-    t1'tvs `disjoint` t2'tvs && hasSubstitutions' where
-        hasSubstitutions' = fromRight False . runUnify' ustate $ hasSubstitutions t1 t2
-
-        ustate = UnifyState (filter (flip Set.notMember alltvs . poly) (toEnum <$> [0..]))
+    t1'tvs `disjoint` t2'tvs && hasSubstitutions t1 t2 where
 
         alltvs = t1'tvs <> t2'tvs
 

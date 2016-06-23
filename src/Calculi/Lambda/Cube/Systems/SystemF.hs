@@ -159,12 +159,7 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
                     -- Query the type of the variable
                     t <- Map.lookup v <$> use (stlcctx.vars)
                     -- Nameerror action in case v doesn't exist within the typing context.
-                    let nameErr = do {
-                        -- Get the current environment
-                        env' <- get;
-                        -- throw the nameerror.
-                        throwError [ErrorContext [] env' (SFNotKnownErr (UnknownVariable v))];
-                    }
+                    let nameErr = throwErrorContext [] (SFNotKnownErr (UnknownVariable v))
                     -- If v's type (t) is Nothing then nameerror, otherwise just return it.
                     maybe nameErr return t
 
@@ -174,16 +169,15 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
                     -- Split fun'type into it's components
                     (fun'from, fun'to) <- case reify fun'type of
                         -- fun'type wasn't a function type, throw an error.
-                        Nothing -> do
-                            -- Get the environment
-                            env' <- get
-                            -- throw the type error
-                            throwError [ErrorContext [fun] env' (SFSimpleTypeErr (NotAFunction fun'type))]
+                        Nothing -> throwErrorContext [fun] (SFSimpleTypeErr (NotAFunction fun'type))
                         -- return the result
                         Just reified -> return reified
-
                     undefined
 
+        throwErrorContext exprStack err = get >>= (\env' -> throwError [ErrorContext exprStack env' err])
+
+        throwErrorContexts exprsAndErrs =
+            get >>= (\env' -> throwError (uncurry (flip ErrorContext env') <$> exprsAndErrs))
         {-
         x =
             -- Check that the argument type is the same or more specific than

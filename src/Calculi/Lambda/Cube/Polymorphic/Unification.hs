@@ -12,19 +12,16 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
     , hasSubstitutions
     , applyAllSubs
     , applyAllSubsGr
+    , unvalidatedApplyAllSubs
     , resolveMutuals
     -- * Unification type
-    , Unify(..)
-    , runUnify
-    , runUnify'
-    , newPolyType
-    -- ** Unification type's state
-    , UnifyState(..)
-    , tapeOfNewPolyTypes
+    , Unify
     -- * Substitution validation
     , substitutionGraph
     , substitutionGraphGr
     , substitutionGraphM
+    , topsortSubs
+    , topsortSubsG
     , occursCheck
     , conflicts
 ) where
@@ -47,66 +44,22 @@ import           Data.Maybe
 import qualified Data.Set                       as Set
 import           Data.Tree
 
-data UnifyState t p = UnifyState {
-    _tapeOfNewPolyTypes :: [p]
-} deriving (Eq, Ord, Show)
-
-makeLenses ''UnifyState
-
-{-|
-    State and Error type for solving unification. In a newtype to
-    make typeerrors more readable.
--}
-newtype Unify t p a = Unify {
-    unifyToTranformers :: ExceptT [SubsErr Gr t p] (State (UnifyState t p)) a
-} deriving (
-             Functor
-           , Applicative
-           , Alternative
-           , Monad
-           , MonadState (UnifyState t p)
-           , MonadError [SubsErr Gr t p]
-           , MonadPlus
-           )
-
-{-|
-    Run a unification action.
--}
-runUnify :: UnifyState t p -> Unify t p a -> Either [SubsErr Gr t p] (a, UnifyState t p)
-runUnify st action =
-    (\(errs, st') -> flip (,) st' <$> errs) . flip runState st $ runExceptT (unifyToTranformers action)
-
-{-|
-    `runUnify`, discarding the final state.
--}
-runUnify' :: UnifyState t p -> Unify t p a -> Either [SubsErr Gr t p] a
-runUnify' st action = fmap fst (runUnify st action)
-
-{-|
-    Pulls a new poly type from the infinite list
--}
-newPolyType :: Unify t p p
-newPolyType = do
-    -- get the variable at the head of the list
-    v <- head <$> use tapeOfNewPolyTypes
-    -- set the list to be to tail of what it is now so
-    -- the variable we just got isn't returned again.
-    tapeOfNewPolyTypes %= tail
-    -- return the variable
-    return v
+type Unify gr t p a = Either [SubsErr gr t p] a
 
 {-|
     `substitutions` but takes place in the Unify type.
 -}
-substitutionsM :: (Polymorphic t, p ~ PolyType t) => t -> t -> Unify t p [Substitution t p]
-substitutionsM t1 t2 = eitherToError $ fmap (uncurry SubsMismatch) `first` substitutions t1 t2
+substitutionsM :: (Polymorphic t, p ~ PolyType t) => t -> t -> Either [SubsErr gr t p] [Substitution t p]
+substitutionsM t1 t2 = fmap (uncurry SubsMismatch) `first` substitutions t1 t2
 
-unify :: forall t p. (Polymorphic t, p ~ PolyType t) => t -> t -> Unify t p [(t, p)]
+unify :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
+      => t -> t
+      -> Either [SubsErr gr t p] [(t, p)]
 unify t1 t2 = do
     -- Find the substitutions and partition them into mutuals and substitutions
-    subs <- resolveMutuals =<< substitutionsM t1 t2
+    subs <- resolveMutuals <$> substitutionsM t1 t2
     -- validate and order the substitutions
-    eitherToError (topsortSubsG <$> substitutionGraphGr subs)
+    topsortSubsG <$> substitutionGraph subs
 
 partitionSubstitutions :: [Substitution t p] -> ([(p, p)], [(t, p)])
 partitionSubstitutions =
@@ -115,23 +68,22 @@ partitionSubstitutions =
 {-|
     Test to see if two types have valid substitutions between eachother.
 -}
-hasSubstitutions :: (Polymorphic t, p ~ PolyType t) => t -> t -> Unify t p Bool
-hasSubstitutions t1 t2 =
-    -- Run a unification action with the current state, converting errors into False
-    -- and a successful unification into a True.
-    gets (\st -> isRight (runUnify st (unify t1 t2)))
+hasSubstitutions :: forall t p. (Polymorphic t, p ~ PolyType t) => t -> t -> Bool
+hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Unify Gr t p [(t, p)])
 
 {-|
     Given a list of substitutions, resolve all the mutual substitutions and
     return a list of substitutions in the form @(t, p)@.
 -}
-resolveMutuals :: forall t p. (Polymorphic t, p ~ PolyType t) => [Substitution t p] -> Unify t p [(t, p)]
-resolveMutuals subs = do
+resolveMutuals :: forall gr t p. (Polymorphic t, p ~ PolyType t)
+               => [Substitution t p] -- ^ The list of substitutions
+               -> [(t, p)] -- ^ The resulting list of substitutions
+resolveMutuals subs =
     let (mutuals, subs') = filter (uncurry (/=)) `first` partitionSubstitutions subs
     -- As a mutual substitution (a,b) means that a is b, every substitution
     -- of the form (T, a) must be duplicated to include (T, b), and every
     -- substitution of the form (M, b) must be duplicated to include (M, a).
-    return (foldr expandMutual subs' mutuals) where
+    in (foldr expandMutual subs' mutuals) where
         expandMutual :: (p, p) -> [(t, p)] -> [(t, p)]
         expandMutual (a, b) _subs = do
             -- Get the single substitution
@@ -169,10 +121,10 @@ resolveMutuals subs = do
 
         etc.
 -}
-(⊑) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Unify t p Bool
-t ⊑ t' = gets $ \st -> fromRight False . runUnify' st $ do
-    subs <- resolveMutuals =<< substitutionsM t' t
-    applySubs <- eitherToError (applyAllSubs subs)
+(⊑) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Bool
+t ⊑ t' = fromRight False $ do
+    subs <- resolveMutuals <$> substitutionsM t' t
+    applySubs <- applyAllSubsGr subs
     return (t' ≣ applySubs t)
 
 infix 4 ⊑
@@ -180,55 +132,10 @@ infix 4 ⊑
 {-|
     Non-unicode @⊑@.
 -}
-(\<) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Unify t p Bool
+(\<) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Bool
 (\<) = (⊑)
 
 infix 4 \<
-
----------------- Taken From the original Polymorphic module ----------------
-
-{-|
-    Unify two type expressions.
--}
-unify' :: forall gr t p. (Polymorphic t, DynGraph gr, PolyType t ~ p)
-      => [p]          -- ^ An infinite list of type variables that don't exist in either type expressions
-                      -- or a greater typing context.
-      -> t            -- ^ The first type expression.
-      -> t            -- ^ The second type expression.
-      -> Either [SubsErr gr t p] ([p], [(t, p)])
-                      -- ^ The result, either substitution errors or a tuple of the remaining
-                      -- poly types in the infinte list and the
-unify' tape t1 t2 = do
-    -- Get the substitutions, turn any mismatches into SubsErrs.
-    subs <- fmap (uncurry SubsMismatch) `first` substitutions t1 t2
-    let (tapeRemainder, subs') = resolveMutuals tape subs
-    validSubs <- topsortSubs subs'
-    return (tapeRemainder, validSubs) where
-        {-
-            With an infinite tape, turn all `Mutual` substitutions into
-            substitutions of the form (t, p), consuming poly types from
-            the infinite list when they're needed to solve mutual substitutions.
-
-            NOTE: May need to rethink how Mutual is structured, there's a massive chance that
-                  that the structure may lead to cycles or clashes that are entirely
-                  composed of poly types that could be solved with a version of this
-                  that tackles mutual substitution of any number of poly types.
-
-                  tl;dr: make Mutual have a list of mutuals instead, put the burden of checking
-                         this put on the implementer of the typesystems.
-        -}
-        resolveMutuals :: [p] -> [Substitution t p] -> ([p], [(t, p)])
-        resolveMutuals _tape = foldl resolveSingle (_tape, []) where
-            {-
-                When encountering a Mutual, consume a poly type from
-                the infinte list, otherwise just convert the substitution
-                into a tuple and pass the list on.
-            -}
-            resolveSingle :: ([p], [(t, p)])
-                          -> Substitution t p
-                          -> ([p], [(t, p)])
-            resolveSingle (h : tl, subs) (Mutual p1 p2)            = (tl , (poly h, p1) : (poly h, p2) : subs)
-            resolveSingle (_tape, subs) (Substitution expr target) = (_tape , (expr, target) : subs)
 
 {-|
     For a given list of substitutions, either find and report inconsistencies
@@ -242,7 +149,9 @@ unify' tape t1 t2 = do
     this means that @N@ will preceed @M@ in the list, but this doesn't make sense
     when we topsort to tuples of the form @(N, p)@.
 -}
-topsortSubs :: forall gr t p. (DynGraph gr, Polymorphic t, p ~ PolyType t) => [(t, p)] -> Either [SubsErr gr t p] [(t, p)]
+topsortSubs :: forall gr t p. (DynGraph gr, Polymorphic t, p ~ PolyType t)
+            => [(t, p)]
+            -> Either [SubsErr gr t p] [(t, p)]
 topsortSubs = fmap topsortSubsG . (substitutionGraph :: [(t, p)] -> Either [SubsErr gr t p] (gr t p))
 
 {-|
@@ -252,22 +161,31 @@ topsortSubs = fmap topsortSubsG . (substitutionGraph :: [(t, p)] -> Either [Subs
     If given a graph with cycles or nodes with 2 or more inward edges of the same label
     then there's no garuntee that the substitutions will be applied correctly.
 -}
-topsortSubsG :: forall gr t p. (Graph gr) => gr t p -> [(t, p)]
+topsortSubsG :: forall gr t p. (Graph gr)
+             => gr t p
+             -> [(t, p)]
 topsortSubsG = unvalidatedEdgeyTopsort
 {-|
     Without validating if the substitutions are consistent, fold them into a single
     function that applies all substitutions to a given type expression.
 -}
-unvalidatedApplyAllSubs :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> t -> t
+unvalidatedApplyAllSubs :: (Polymorphic t, p ~ PolyType t)
+                        => [(t, p)]
+                        -> t
+                        -> t
 unvalidatedApplyAllSubs = foldr (\sub f -> uncurry applySubstitution sub . f) id
 
 {-|
     Validate substitutions and fold them into a single substitution function.
 -}
-applyAllSubs :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr) => [(t, p)] -> Either [SubsErr gr t p] (t -> t)
+applyAllSubs :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
+             => [(t, p)]
+             -> Either [SubsErr gr t p] (t -> t)
 applyAllSubs = fmap unvalidatedApplyAllSubs . topsortSubs
 
-applyAllSubsGr :: (Polymorphic t, p ~ PolyType t) => [(t, p)] -> Either [SubsErr Gr t p] (t -> t)
+applyAllSubsGr :: (Polymorphic t, p ~ PolyType t)
+               => [(t, p)]
+               -> Either [SubsErr Gr t p] (t -> t)
 applyAllSubsGr = applyAllSubs
 
 {-|
@@ -355,7 +273,8 @@ occursCheck graph =
             uncurry (branchConflicts graph) <$> conflicts graph
 
 {-|
-    Find all contexts with non-unique inward labels.
+    Find all contexts with non-unique inward labels, paired with each
+    label that wasn't unique.
 -}
 conflicts :: (DynGraph gr, Ord p, Ord t) => gr t p -> [(p, Graph.Context t p)]
 conflicts graph = do
@@ -365,10 +284,18 @@ conflicts graph = do
     conflict <- nub =<< filter hasSome (group (inn graph node <&> (^._3)))
     return (conflict, context graph node)
 
+{-|
+    Given a graph, a conflicting label, and the node where the label is conflicting;
+    branch out towards it's roots.
+-}
 branchConflicts :: (DynGraph gr, Ord p, Ord t) => gr t p -> p -> Graph.Context t p -> ([Tree (t, [p])], t)
 branchConflicts graph lbl ctx@(_,nn,nl,_) = flip (,) nl $ do
+    -- Get all the inward edges
     let inward = filter ((== lbl) . (^._3)) (inn graph nn)
+    -- Reverse depth-first search to find all the roots, using the contexts
+    -- as the tree's value.
     tree <- rdffWith id ((^._1) <$> inward) graph
+    -- process the tree,
     return $ processTree ctx tree where
         processTree :: Graph.Context t p -> Tree (Graph.Context t p) -> Tree (t, [p])
         processTree pctx (Node ctx forest) =
