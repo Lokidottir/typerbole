@@ -28,7 +28,7 @@ main = hspec $
                 followsSimpleType (arbitrary :: Gen SimplyTyped')
             describe "System-F" $ do
                 followsSimpleType (arbitrary :: Gen SystemF')
-                parallel $ followsPolymorphic (arbitrary :: Gen SystemF')
+                followsPolymorphic (arbitrary :: Gen SystemF')
             describe "System-Fω" $ do
                 followsSimpleType (arbitrary :: Gen SystemFOmega')
                 followsPolymorphic (arbitrary :: Gen SystemFOmega')
@@ -59,7 +59,7 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (quantifyInverse :: (PolyType t) -> t -> Bool)
     prop "follows type-ordering rule 1"
         (typeOrderingRule :: t -> Bool)
-    modifyMaxSuccess (* 20) $ describe "Unification rules (x 20 number of tests)" $ do
+    parallel . modifyMaxSuccess (* 20) . describe "Unification rules (x 20 number of tests)" $ do
         prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
             forAll (arbitrary `suchThat` unifyR1Predicate)
                 (uncurry unifyR1 :: ((t, t) -> Bool))
