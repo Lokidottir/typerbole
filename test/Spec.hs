@@ -103,8 +103,7 @@ unifyR2 !t1 !t2 =
         subs <- unify t1 t2
         u <- applyAllSubsGr subs
         return $
-            (freeTypeVariables (u t1) <> freeTypeVariables (u t2))
-            `Set.isSubsetOf` (freeTypeVariables t1 <> freeTypeVariables t2)
+            (bases (u t1) <> bases (u t2)) `Set.isSubsetOf` (bases t1 <> bases t2)
 
 {-
     The input predicate for unifyR1; the type variables in each expression

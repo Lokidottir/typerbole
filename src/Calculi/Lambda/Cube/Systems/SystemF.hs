@@ -13,7 +13,7 @@ import           Calculi.Lambda.Cube.Typechecking
 import           Control.Monad
 import           Control.Monad.State
 import           Control.Monad.Except
-import           Control.Lens
+import           Control.Lens hiding (elements)
 import           Data.Either.Combinators
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -208,30 +208,33 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
             get >>= (\env' -> throwError (uncurry (flip ErrorContext env') <$> exprsAndErrs))
 
         calcUnknownTypes t types =
-            SFNotKnownErr . UnknownType <$> Set.toList (Set.difference (typeConstants t <> freeTypeVariables t) types)
+            SFNotKnownErr . UnknownType <$> Set.toList (Set.difference types undefined)
 
         outmostDeclaredPolys (Forall p texpr) = Set.insert (poly p) (outmostDeclaredPolys texpr)
         outmostDeclaredPolys _ = Set.empty
-        {-
-        x =
-            -- Check that the argument type is the same or more specific than
-            -- the type of the expected argument to fun.
-            | from ⊑ arg'type -> do
-                case substitutions arg'type from of
-                    -- There was a mismatch in structure, this needs
-                    -- to be thrown as an error.
-                    Nothing -> do
-                        env' <- get
-                        let structErrs = uncurry UnexpectedType <$> mismatchErrs arg'type from
-                        throwError $ ErrorContext [] env' . SFSimpleTypeErr <$> structErrs
 
-                    Just subs -> case applyAllSubsGr subs of
-                        Left subserrs -> do
-                            env' <- get
-                            throwError $ ErrorContext [] env' . SFSubsErr <$> subserrs
-
-                        Right applySubs -> return applySubs -}
-
-instance (Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
+instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
-    arbitrary = sized generatorP
+    arbitrary = sized $ \size -> do
+        types <- sized availableTypes
+        typeExpr <- generateExpr types size
+        return $ generalise' typeExpr where
+            availableTypes :: Int -> Gen [SystemF m p]
+            availableTypes size = vectorOf (abs size + 1) (oneof [poly <$> arbitrary, mono <$> arbitrary])
+
+            generateExpr :: [SystemF m p] -> Int -> Gen (SystemF m p)
+            generateExpr types size
+                | size <= 1 = elements types
+                | otherwise = arbFunction types size
+
+            arbFunction :: [SystemF m p] -> Int -> Gen (SystemF m p)
+            arbFunction types size = do
+                (sizeFrom, sizeTo) <- splitSize size
+                from <- generateExpr types sizeFrom
+                to <- generateExpr types sizeTo
+                return (from /-> to)
+
+            splitSize :: Int -> Gen (Int, Int)
+            splitSize size = do
+                size' <- choose (1, size + 1)
+                return (size', size - size')
