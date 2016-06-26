@@ -120,7 +120,7 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
 
 instance (Data m, Data p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m p) where
     -- TODO: remove instances of Data for m and p
-    arbitrary = sized generatorP
+    arbitrary = sized generatorSR
 
 {-|
     Given a function arrow representation of type @m@, replace all

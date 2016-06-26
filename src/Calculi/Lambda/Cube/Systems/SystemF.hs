@@ -215,4 +215,4 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
 
 instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
-    arbitrary = sized generatorP
+    arbitrary = sized generatorSR
