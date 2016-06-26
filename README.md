@@ -11,6 +11,7 @@ Type theory isn't that scary, honest.
 
 ### TODOs
 
+- [ ] Document the type expression psudocode
 - [ ] Design a typeclass for typesystems with haskell-like (`Num a => a`) typeclass constraints.
 - [ ] Add constants to the lambda calculus AST.
 - [ ] Provide a default way of evaluating lambda expressions.
