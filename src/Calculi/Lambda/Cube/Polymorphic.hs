@@ -87,7 +87,7 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
 
         * A substitution of a poly type \"a\" for mono type \"X\"
 
-            >>> substitutions (X) (a) =
+            >>> substitutions (X) (a)
             Right [Substitution (X) (a)]
 
         * Two type expressions have substitutions between eachother.
@@ -120,16 +120,19 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
 
         * Substituting all instance of \"a\" with \"X\"
 
-            @`applySubstitution` X a (∀ a b. a → b → a) = (∀ b. X → b → X)@
+            >>> applySubstitution X a (∀ a b. a → b → a)
+            (∀ b. X → b → X)@
 
         * Substitution application in a type expression with a type constructor.
 
-            @`applySubstitution` (X → Y) x (M x) = (M (X → Y))@
+            >>> applySubstitution (X → Y) x (M x)
+            (M (X → Y))
 
         * Applying a substitution to a type expression that doesn't contain the poly type
           being substituted
 
-            @`applySubstitution` Y x (M Q) = (M Q)@
+            >>> applySubstitution Y x (M Q)
+            (M Q)
     -}
     applySubstitution :: t -> PolyType t -> t -> t
 
@@ -140,11 +143,13 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
 
         * Quantifying a type variable that appears in a type expression.
 
-            @`quantify` a (a → X) = (∀ a. a → X)@
+            >>> quantify a (a → X)
+            (∀ a. a → X)
 
         * Quantifying a type variable that doesn't appear in a type expression
 
-            @`quantify` a (b → X) = (∀ a. b → X)@
+            >>> quantify a (b → X)
+            (∀ a. b → X)
     -}
     quantify :: PolyType t -> t -> t
 
@@ -156,15 +161,18 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
 
         * Unquantifying a type expression that quantifies a single poly type.
 
-            @`unquantify` (∀ a. a → b) = Just (a, a → b)@
+            >>> unquantify (∀ a. a → b)
+            Just (a, a → b)
 
         * Unquantifying a type expression that quantifies multiple poly types
 
-            @`unquantify` (∀ a b. a b) = Just (a, ∀ b. a b)@
+            >>> unquantify (∀ a b. a b)
+            Just (a, ∀ b. a b)
 
         * Unquantifying a type expression that quantifies none of it's poly types.
 
-            @`unquantify` (A b) = Nothing@
+            >>> unquantify (A b)
+            Nothing
     -}
     unquantify :: t -> Maybe (PolyType t, t)
 
@@ -182,15 +190,18 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
 
         * Type expression with some of it's poly types quantified.
 
-            @`freeTypeVariables` (∀ a b. a → b → c d)) = `Set.fromList` [c, d]@
+            >>> freeTypeVariables (∀ a b. a → b → c d))
+            Set.fromList [c, d]
 
         * Type expression with no quantified poly types.
 
-            @`freeTypeVariables` (a → b → c) = `Set.fromList` [a, b, c]@
+            >>> freeTypeVariables (a → b → c)
+            Set.fromList [a, b, c]
 
         * Type expression with no unquantified poly types.
 
-            @`freeTypeVariables` (∀ c. X → c) = `Set.empty`@
+            >>> freeTypeVariables (∀ c. X → c)
+            Set.empty
     -}
     freeTypeVariables :: t -> Set.Set t
 
@@ -232,9 +243,11 @@ typeConstants t = Set.difference (bases t) (typeVariables t)
     Quantify every free type variable in a type expression, excluding a
     set of free type variables to not quantify.
 
-    @`generalise` `Set.empty` (x → y) = (∀ x y. x → y)@
+    >>> generalise Set.empty (x → y)
+    (∀ x y. x → y)
 
-    @`generalise` (`Set.fromList` [a, b]) (a → b → c) = (∀ c. a → b → c) @
+    >>> generalise (Set.fromList [a, b]) (a → b → c)
+    (∀ c. a → b → c)
 -}
 generalise :: forall t. Polymorphic t => Set.Set t -> t -> t
 generalise exclude t = foldr quantify t ftvsBare where
@@ -255,11 +268,14 @@ generalise' = generalise Set.empty
     being made being symbolically identical, where binds and type variables appear in
     the same place but may have different names (this is Alpha Equivalence).
 
-    @`areEquivalent` (∀ a. X → a) (∀ z. X → z) = True@
+    >>> areEquivalent (∀ a. X → a) (∀ z. X → z)
+    True
 
-    @`areEquivalent` (M → X) (M → X) = True@
+    >>> areEquivalent (M → X) (M → X)
+    True
 
-    @`areEquivalent` (∀ a. a) (∀ z. z → z) = False@
+    >>> areEquivalent (∀ a. a) (∀ z. z → z)
+    False
 -}
 areEquivalent :: forall t. Polymorphic t => t -> t -> Bool
 areEquivalent x y = fromRight False $ all isMutual <$> subs where

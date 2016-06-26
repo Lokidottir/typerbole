@@ -208,7 +208,7 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
             get >>= (\env' -> throwError (uncurry (flip ErrorContext env') <$> exprsAndErrs))
 
         calcUnknownTypes t types =
-            SFNotKnownErr . UnknownType <$> Set.toList (Set.difference types undefined)
+            SFNotKnownErr . UnknownType <$> Set.toList (Set.difference (bases t) types)
 
         outmostDeclaredPolys (Forall p texpr) = Set.insert (poly p) (outmostDeclaredPolys texpr)
         outmostDeclaredPolys _ = Set.empty
