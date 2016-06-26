@@ -215,26 +215,4 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
 
 instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
-    arbitrary = sized $ \size -> do
-        types <- sized availableTypes
-        typeExpr <- generateExpr types size
-        return $ generalise' typeExpr where
-            availableTypes :: Int -> Gen [SystemF m p]
-            availableTypes size = vectorOf (abs size + 1) (oneof [poly <$> arbitrary, mono <$> arbitrary])
-
-            generateExpr :: [SystemF m p] -> Int -> Gen (SystemF m p)
-            generateExpr types size
-                | size <= 1 = elements types
-                | otherwise = arbFunction types size
-
-            arbFunction :: [SystemF m p] -> Int -> Gen (SystemF m p)
-            arbFunction types size = do
-                (sizeFrom, sizeTo) <- splitSize size
-                from <- generateExpr types sizeFrom
-                to <- generateExpr types sizeTo
-                return (from /-> to)
-
-            splitSize :: Int -> Gen (Int, Int)
-            splitSize size = do
-                size' <- choose (1, size + 1)
-                return (size', size - size')
+    arbitrary = sized generatorP

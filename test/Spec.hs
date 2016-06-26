@@ -22,13 +22,13 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 
 main :: IO ()
-main = hspec . parallel $
+main = hspec $
         describe "Type systems follow laws and properties" $ do
             describe "SimplyTyped" $
                 followsSimpleType (arbitrary :: Gen SimplyTyped')
             describe "System-F" $ do
                 followsSimpleType (arbitrary :: Gen SystemF')
-                followsPolymorphic (arbitrary :: Gen SystemF')
+                parallel $ followsPolymorphic (arbitrary :: Gen SystemF')
             describe "System-Fω" $ do
                 followsSimpleType (arbitrary :: Gen SystemFOmega')
                 followsPolymorphic (arbitrary :: Gen SystemFOmega')
