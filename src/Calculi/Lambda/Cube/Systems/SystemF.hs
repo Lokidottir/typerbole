@@ -8,6 +8,7 @@ import           Data.Bifunctor.TH
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Calculi.Lambda.Cube.Polymorphic
+import           Calculi.Lambda.Cube.Polymorphic.Unification
 import           Calculi.Lambda.Cube.Typechecking
 import           Control.Monad
 import           Control.Monad.State
@@ -172,12 +173,45 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
                         Nothing -> throwErrorContext [fun] (SFSimpleTypeErr (NotAFunction fun'type))
                         -- return the result
                         Just reified -> return reified
-                    undefined
+                    case unify fun'from arg'type of
+                        Left errs ->
+                            -- If errors were encountered during unification, throw them.
+                            throwErrorContexts ((,) [] . SFSubsErr <$> errs)
+                        Right subs ->
+                            -- If substitutions were unified, then apply them to the
+                            -- return type of the function.
+                            return $ unvalidatedApplyAllSubs subs fun'to
+
+                Lambda (v, t) expr -> do
+                    -- If there are any types in v's type expression that
+                    -- do not appear in the typing context or are not declated
+                    -- within it, throw errors for the unknown types.
+                    unknownTypes <- calcUnknownTypes t <$> use (stlcctx.allTypes)
+                    unless (null unknownTypes) (throwErrorContexts ((,) [] <$> unknownTypes))
+                    -- save the current state in scope
+                    oldstate <- get
+                    -- Register the variable v to have the type t in the current state
+                    -- and typecheck the lambda's body with that state.
+                    stlcctx.vars %= Map.insert v t
+                    -- Also register all the outmost declared poly types
+                    stlcctx.allTypes %= (outmostDeclaredPolys t <>)
+                    -- Typecheck the lambda's expression with this added information
+                    expr'type <- typecheck' expr
+                    -- Reset to the old state.
+                    put oldstate
+                    -- Return the type of this expression.
+                    return (t /-> expr'type)
 
         throwErrorContext exprStack err = get >>= (\env' -> throwError [ErrorContext exprStack env' err])
 
         throwErrorContexts exprsAndErrs =
             get >>= (\env' -> throwError (uncurry (flip ErrorContext env') <$> exprsAndErrs))
+
+        calcUnknownTypes t types =
+            SFNotKnownErr . UnknownType <$> Set.toList (Set.difference (typeConstants t <> freeTypeVariables t) types)
+
+        outmostDeclaredPolys (Forall p texpr) = Set.insert (poly p) (outmostDeclaredPolys texpr)
+        outmostDeclaredPolys _ = Set.empty
         {-
         x =
             -- Check that the argument type is the same or more specific than

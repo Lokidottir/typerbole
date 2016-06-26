@@ -39,7 +39,8 @@ import           Control.Lens as Lens hiding ((&))
 -}
 data SubsContext t p = SubsContext {
       _subsMade :: Map.Map p t
-    -- ^ The substitutions made so far, where the key
+    -- ^ The substitutions made so far, where the key is the type variable
+    -- that is substituted and the value is what is substituting it.
     , _tape :: [p]
     -- ^ An infinite list of polytypes not present in the who typing context.
 } deriving (Eq, Ord)

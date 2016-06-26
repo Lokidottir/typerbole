@@ -41,6 +41,7 @@ import           Data.Function (on)
 import           Data.List.Ordered
 import           Data.List (groupBy, group, partition)
 import           Data.Maybe
+import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
 import           Data.Tree
 
