@@ -30,11 +30,12 @@ The simply-typed lambda calculus is the simplest and least expressive typesystem
 zero : Int
 zero = 0
 
-addOne :: Int -> Int
-addOne n = n + 1
+isFive : Int -> Bool
+isFive 5 = True
+isFive _ = False
 ```
 
-On it's own the simply-typed lambda calculus lacks the ability to express recursion or a generic functions, and many other useful constructs. Each axis of the lambda cube adds different kinds of expressiveness, allowing more and more programs to be validated at compile time safely.
+On it's own the simply-typed lambda calculus lacks the ability to express recursion without typerrors or functions and values whose type is generic, and many other useful constructs. Each axis of the lambda cube adds different kinds of expressiveness, allowing more and more programs to be validated at compile time safely.
 
 #### Polymorphism
 
@@ -42,13 +43,13 @@ Polymorphism allows you to write type expressions that expose poly types (also r
 
 ```haskell
 -- Identity functions in the simply-typed lambda calculus.
-identityInt :: Int -> Int
+identityInt : Int -> Int
 identityInt x = x
 
-identityBool :: Bool -> Bool
+identityBool : Bool -> Bool
 identityBool x = x
 
-identityIntToInt :: (Int -> Int) -> (Int -> Int)
+identityIntToInt : (Int -> Int) -> (Int -> Int)
 identityIntToInt x = x
 ...
 -- Etc. Do for the infinite number of types that exist.
@@ -57,14 +58,24 @@ identityIntToInt x = x
 Instead, a single identity function can work **for all** types.
 
 ```haskell
--- identity function (singular!) in a polymorphic lambda calculus.
-identity :: forall a. a -> a
+-- identity function (just the one!) in a polymorphic lambda calculus.
+identity : forall a. a -> a
 identity x = x
 ```
 
 #### Higher-order types
 
-Higher-order types allow for compound types (Like `IO String` in haskell) by allowing
+Higher-order types allow for compound types (Like `IO String` or `Set Int` in haskell).
+
+```haskell
+listOfInt : [Int]
+listOfInt = [1,2,3,4,5]
+
+setOfInt : Set Int
+setOfInt = fromList [1,2,3,4,5]
+```
+
+#### Dependent types
 
 ***
 
@@ -84,3 +95,4 @@ Higher-order types allow for compound types (Like `IO String` in haskell) by all
 - [ ] Make the quasiquoters use the lambda cube typeclasses instead of specific typesystem implementations.
 - [ ] Have a typeclass for evaluatable calculi (Kappa calculus and the like). This may be unnecessary abstraction.
 - [ ] Subhask-style automated test writing.
+- [ ] More formally represent typing rules instead of just implementing typesystems ad-hoc and hoping they are at least equivalent. (Would require a significant amount of refectoring)

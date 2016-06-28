@@ -39,7 +39,7 @@ data SystemF m p =
     deriving (Eq, Ord, Data)
 
 instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
-    show (Mono m) = (show m)
+    show (Mono m) = show m
     show (Poly p) =  show p
     show (Function a b) =
         let astr = if isFunction a || isJust (unquantify a) then "(" ++ show a ++ ")" else show a
@@ -50,7 +50,7 @@ instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
             getQuant _expr             = ([], _expr)
 
             (ps, _expr) = getQuant expr
-        in "forall " ++ show p ++ " " ++ unwords (show <$> ps) ++ ". " ++ show _expr
+        in "forall " ++ unwords (show <$> (p:ps)) ++ ". " ++ show _expr
 
 deriveBifunctor ''SystemF
 deriveBifoldable ''SystemF

@@ -87,3 +87,21 @@ test-suite typerbole-testing
                      , TemplateHaskell
                      , DeriveGeneric
                      , TypeFamilies
+
+-- Executable to generate vector graphics related to this
+-- project.
+executable typerbole-diagrams
+  hs-source-dirs:      diagrams
+  main-is:             Main.hs
+  build-depends:       base
+                     , diagrams-lib
+                     , diagrams-svg
+                     , colour
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  default-language:    Haskell2010
+  default-extensions:  ScopedTypeVariables
+                     , LambdaCase
+                     , NoMonomorphismRestriction
+                     , TemplateHaskell
+                     , DeriveGeneric
+                     , TypeFamilies
