@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-|
     Module containing functions related to solving and unifying
     polymorphic type expressions.
@@ -14,8 +12,6 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
     , applyAllSubsGr
     , unvalidatedApplyAllSubs
     , resolveMutuals
-    -- * Unification type
-    , Unify
     -- * Substitution validation
     , substitutionGraph
     , substitutionGraphGr
@@ -45,7 +41,6 @@ import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
 import           Data.Tree
 
-type Unify gr t p a = Either [SubsErr gr t p] a
 
 {-|
     `substitutions` but takes place in the Unify type.
@@ -53,6 +48,11 @@ type Unify gr t p a = Either [SubsErr gr t p] a
 substitutionsM :: (Polymorphic t, p ~ PolyType t) => t -> t -> Either [SubsErr gr t p] [Substitution t p]
 substitutionsM t1 t2 = fmap (uncurry SubsMismatch) `first` substitutions t1 t2
 
+{-
+    Get the sequence of substitutions needed to unify two type expressions.
+
+    >>> unify ()
+-}
 unify :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
       => t -> t
       -> Either [SubsErr gr t p] [(t, p)]
@@ -70,7 +70,7 @@ partitionSubstitutions =
     Test to see if two types have valid substitutions between eachother.
 -}
 hasSubstitutions :: forall t p. (Polymorphic t, p ~ PolyType t) => t -> t -> Bool
-hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Unify Gr t p [(t, p)])
+hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Either [SubsErr Gr t p] [(t, p)])
 
 {-|
     Given a list of substitutions, resolve all the mutual substitutions and
@@ -97,9 +97,6 @@ resolveMutuals subs =
     the first.
 
     ===Behaviour
-
-    __NOTE:__ These examples occur within the Unify type, and must be put through a runUnify
-    function before the results can be computed.
 
     * A type expression with poly types being ordered against one without them.
 
@@ -184,6 +181,9 @@ applyAllSubs :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
              -> Either [SubsErr gr t p] (t -> t)
 applyAllSubs = fmap unvalidatedApplyAllSubs . topsortSubs
 
+{-|
+    `applyAllSubs` using fgl's `Gr`.
+-}
 applyAllSubsGr :: (Polymorphic t, p ~ PolyType t)
                => [(t, p)]
                -> Either [SubsErr Gr t p] (t -> t)
@@ -201,10 +201,14 @@ substitutionGraph subs =
     let (errs, (_, graph :: gr t p)) = run empty (substitutionGraphM subs)
     in if null errs then Right graph else Left errs
 
+{-|
+    `substitutionGraph` using fgl's `Gr`.
+-}
 substitutionGraphGr :: forall t p. (Polymorphic t, p ~ PolyType t)
               => [(t,p)]
               -> Either [SubsErr Gr t p] (Gr t p)
 substitutionGraphGr = substitutionGraph
+
 {-|
     A version of `substitutionGraph` that works within fgl's NodeMap state monad.
 -}
