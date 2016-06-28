@@ -4,8 +4,14 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 
 {-|
-    Dependent types, scary things. Very scary things. Not yet implemented.
+    Typesystems which can
 -}
 class SimpleType t => Dependent t where
-    -- Going to want to have a method for exposing values to
-    -- the type expression.
+
+    -- | The variable type to be used
+    type VarType t :: *
+
+    {-|
+        Lift a value to a type.
+    -}
+    valueToType :: LambdaExpr (VarType t) t -> t
