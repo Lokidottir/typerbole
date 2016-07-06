@@ -236,4 +236,4 @@ instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (
             massUnquantify t@Mono{} = t
             massUnquantify t@Poly{} = t
             massUnquantify (Function from to) = massUnquantify from /-> massUnquantify to
-            massUnquantify (Forall _ texpr) = texpr
+            massUnquantify (Forall _ texpr) = massUnquantify texpr
