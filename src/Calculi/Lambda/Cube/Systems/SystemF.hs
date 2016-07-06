@@ -215,4 +215,9 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
 
 instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
-    arbitrary = sized generatorSR
+    arbitrary = sized (generatorSRWith aliases) where
+        aliases :: [AliasR Gen]
+        aliases = [
+                    aliasR (\() -> arbitrary :: Gen m)
+                  , aliasR (\() -> arbitrary :: Gen p)
+                  ]
