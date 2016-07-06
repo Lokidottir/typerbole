@@ -223,23 +223,17 @@ instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (
                   ]
 
         {-
-            Remove any unneeded quantifications and generalise any unbound type variables
-            of a type expression
+            Remove all generated quantifications and then generalise the expression's type variables.
         -}
-        process = generalise' . fst . massUnquantify where
-            massUnquantify :: SystemF m p -> (SystemF m p, Set.Set (SystemF m p))
-            massUnquantify t@Mono{} = (t, Set.empty)
-            massUnquantify t@Poly{} = (t, Set.singleton t)
-            massUnquantify (Function from to) =
-                let (from', from'ftvs) = massUnquantify from
-                    (to'  , to'ftvs)   = massUnquantify to
-                in (from' /-> to', from'ftvs <> to'ftvs)
-            massUnquantify (Forall p texpr) =
-                let (texpr', ftvs) = massUnquantify texpr
-                in if Poly p `Set.member` ftvs then
-                     -- if the poly type 'p' appears in the mass-unquantified type expression
-                     -- then this forall isn't redundant. We delete the poly type from the
-                     -- set of free type variables/poly types.
-                     (Forall p texpr', Set.delete (Poly p) ftvs)
-                     else -- Otherwise just return what the unquantification of texpr got us
-                        (texpr', ftvs)
+        process = generalise' . massUnquantify where
+            {-
+                Actually, remove all quantifications as we don't actually care about them during
+                substitution, which is most of what's getting tested.
+
+                Also SystemF doesn't do existential quantification by default (probably?)
+            -}
+            massUnquantify :: SystemF m p -> SystemF m p
+            massUnquantify t@Mono{} = t
+            massUnquantify t@Poly{} = t
+            massUnquantify (Function from to) = massUnquantify from /-> massUnquantify to
+            massUnquantify (Forall _ texpr) = texpr
