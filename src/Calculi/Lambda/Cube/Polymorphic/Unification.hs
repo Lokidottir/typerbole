@@ -5,6 +5,7 @@
 module Calculi.Lambda.Cube.Polymorphic.Unification (
     -- * Unification related functions
       unify
+    , unifyGr
     , (⊑)
     , (\<)
     , hasSubstitutions
@@ -61,6 +62,11 @@ unify t1 t2 = do
     subs <- resolveMutuals <$> substitutionsM t1 t2
     -- validate and order the substitutions
     topsortSubsG <$> substitutionGraph subs
+
+unifyGr :: forall t p. (Polymorphic t, p ~ PolyType t)
+      => t -> t
+      -> Either [SubsErr Gr t p] [(t, p)]
+unifyGr = unify
 
 partitionSubstitutions :: [Substitution t p] -> ([(p, p)], [(t, p)])
 partitionSubstitutions =
@@ -163,6 +169,7 @@ topsortSubsG :: forall gr t p. (Graph gr)
              => gr t p
              -> [(t, p)]
 topsortSubsG = unvalidatedEdgeyTopsort
+
 {-|
     Without validating if the substitutions are consistent, fold them into a single
     function that applies all substitutions to a given type expression.

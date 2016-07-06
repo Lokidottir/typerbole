@@ -71,8 +71,8 @@ test-suite typerbole-testing
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
-                     , hspec
                      , QuickCheck
+                     , hspec
                      , checkers
                      , typerbole
                      , containers

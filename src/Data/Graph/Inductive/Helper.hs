@@ -47,7 +47,12 @@ cyclesOfGraph graph = fromMaybe []   -- give a default to bring this out of the 
     Given a graph, generate a possibly empty list of subgraphs that are the it's cycles.
 -}
 cyclicSubgraphs :: forall gr n e. (DynGraph gr, Ord n, Ord e) => gr n e -> [gr n e]
-cyclicSubgraphs graph = flip subgraph graph <$> filter hasSome (scc graph)
+cyclicSubgraphs graph = flip subgraph graph <$> filter hasSomeLI (scc graph) where
+    -- hasSome but is inclusive of loops (nodes with edges to itself)
+    hasSomeLI :: [Node] -> Bool
+    hasSomeLI [] = False
+    hasSomeLI [n] = not . null $ filter (\(n1,n2,_) -> n == n1 && n1 == n2) (out graph n ++ inn graph n)
+    hasSomeLI _ = True
 
 -- | Returns true if a list has more than 1 element
 hasSome :: [a] -> Bool

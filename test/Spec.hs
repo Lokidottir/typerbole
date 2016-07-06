@@ -61,11 +61,25 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (typeOrderingRule :: t -> Bool)
     parallel . modifyMaxSuccess (* 20) . describe "Unification rules (x 20 number of tests)" $ do
         prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
-            forAll (arbitrary `suchThat` unifyR1Predicate)
+            forAll (arbitrary' `suchThat` unifyR1Predicate)
                 (uncurry unifyR1 :: ((t, t) -> Bool))
         prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
-            forAll (arbitrary `suchThat` unifyR1Predicate)
+            forAll (arbitrary' `suchThat` unifyR1Predicate)
                 (uncurry unifyR2 :: ((t, t) -> Bool))
+    where
+        {-
+            Tweaked random generator that includes some type expressions that
+            are more likely to catch failing cases a little more often.
+            (i.e. type expressions of the form "forall a. a -> a" cause a lot of
+            interesting problems)
+        -}
+        arbitrary' :: Gen (t, t)
+        arbitrary' = frequency [(9, arbitrary), (1, endomorphism)] where
+            endomorphism = do
+                tvar <- arbitrary :: Gen (PolyType t)
+                l <- arbitrary :: Gen t
+                return (l, quantify tvar (poly tvar /-> poly tvar))
+
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
