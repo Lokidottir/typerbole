@@ -70,7 +70,7 @@ unifyGr = unify
 
 partitionSubstitutions :: [Substitution t p] -> ([(p, p)], [(t, p)])
 partitionSubstitutions =
-    partitionEithers. fmap (\case (Mutual x y) -> Left (x, y); (Substitution x y) -> Right (x, y);)
+    partitionEithers . fmap (\case (Mutual x y) -> Left (x, y); (Substitution x y) -> Right (x, y);)
 
 {-|
     Test to see if two types have valid substitutions between eachother.
@@ -82,21 +82,35 @@ hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Either [SubsErr Gr t p] [(t, p)
     Given a list of substitutions, resolve all the mutual substitutions and
     return a list of substitutions in the form @(t, p)@.
 -}
-resolveMutuals :: forall gr t p. (Polymorphic t, p ~ PolyType t)
+resolveMutuals :: forall t p. (Polymorphic t, p ~ PolyType t)
                => [Substitution t p] -- ^ The list of substitutions
                -> [(t, p)] -- ^ The resulting list of substitutions
 resolveMutuals subs =
-    let (mutuals, subs') = filter (uncurry (/=)) `first` partitionSubstitutions subs
+    let (mutuals, subs') = partitionSubstitutions subs
     -- As a mutual substitution (a,b) means that a is b, every substitution
     -- of the form (T, a) must be duplicated to include (T, b), and every
     -- substitution of the form (M, b) must be duplicated to include (M, a).
-    in (foldr expandMutual subs' mutuals) where
+    in foldr expandMutual subs' (sortMutuals subs' mutuals) where
         expandMutual :: (p, p) -> [(t, p)] -> [(t, p)]
         expandMutual (a, b) _subs = do
             -- Get the single substitution
             sub@(term, var) <- _subs
-            -- if either a or b are equal to var then
+            -- if either a or b are equal to var then duplicate the substitution.
             if a == var || b == var then [(term, a), (term, b)] else return sub
+
+        {-
+            Reorder the mutuals so that they're resolved in an order that
+            doesn't miss out on duplications.
+
+            NOTE: This is a bodge, a proper topsort of these needs to be done as a graph
+                  transform, probably.
+        -}
+        sortMutuals :: [(t, p)] -> [(p, p)] -> [(p, p)]
+        sortMutuals _subs = sortOn (\(a, b) -> max (subCount a) (subCount b)) where
+            -- Find the number of times a polytype is substituted (Should be 1 or 0, could be more
+            -- but that'll be caught by the occurs check later).
+            subCount :: p -> Integer
+            subCount sub = foldr (\(_, sub') -> if sub' == sub then (+ 1) else id ) 0 _subs
 
 {-|
     Type ordering operator, true if the second argument is more specific or equal to
@@ -238,9 +252,12 @@ substitutionGraphM subs = do
     {- Note: to make this work from a point of theory, all the targets in "subs" are turned into
        type expressions using the polymorphic constructor, allowing all substitutions to
        have at least one edge from the substitutions to the targets. -}
-    let typeExprs = nubSort $ concat ((\(t, p) -> [t, poly p]) <$> subs)
+    let typeExprs = nubSort $ subs >>= (\(t, p) -> [t, poly p])
     -- Build a list of type expressions and their bases.
-    let basesList = (\t -> (t, freeTypeVariables t)) <$> typeExprs
+    let basesList = (\t -> (t, typeVariables t)) <$> typeExprs
+                                -- ^ Why not freeTypeVariables?
+                                -- Because during random tests the case where a variable was
+                                -- quantified in different areas happened a bunch.
     -- Construct the edges
     let subsEdges = buildEdge <$> subs <*> basesList
     -- Insert the nodes. (crashes if this isn't done first, because fgl!)
