@@ -22,17 +22,19 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 
 main :: IO ()
-main = hspec $
-        describe "Type systems follow laws and properties" $ do
-            describe "SimplyTyped" $
-                followsSimpleType (arbitrary :: Gen SimplyTyped')
-            describe "System-F" $ do
-                followsSimpleType (arbitrary :: Gen SystemF')
-                followsPolymorphic (arbitrary :: Gen SystemF')
-            describe "System-Fω" $ do
-                followsSimpleType (arbitrary :: Gen SystemFOmega')
-                followsPolymorphic (arbitrary :: Gen SystemFOmega')
-                followsHigherOrder (arbitrary :: Gen SystemFOmega')
+main = hspec $ do
+    describe "Type systems follow laws and properties" $ do
+        describe "SimplyTyped" $
+            followsSimpleType (arbitrary :: Gen SimplyTyped')
+        describe "System-F" $ do
+            followsSimpleType (arbitrary :: Gen SystemF')
+            followsPolymorphic (arbitrary :: Gen SystemF')
+        describe "System-Fω" $ do
+            followsSimpleType (arbitrary :: Gen SystemFOmega')
+            followsPolymorphic (arbitrary :: Gen SystemFOmega')
+            followsHigherOrder (arbitrary :: Gen SystemFOmega')
+
+    unificationRules (arbitrary :: Gen SystemF')
 
 type SimplyTyped' = SimplyTyped AlphabetUpper
 type SystemFOmega' = SystemFOmega AlphabetUpper AlphabetLow
@@ -59,13 +61,24 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (quantifyInverse :: (PolyType t) -> t -> Bool)
     prop "follows type-ordering rule 1"
         (typeOrderingRule :: t -> Bool)
-    parallel . modifyMaxSuccess (* 20) . describe "Unification rules (x 20 number of tests)" $ do
-        prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
-            forAll (arbitrary' `suchThat` unifyR1Predicate)
-                (uncurry unifyR1 :: ((t, t) -> Bool))
-        prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
-            forAll (arbitrary' `suchThat` unifyR1Predicate)
-                (uncurry unifyR2 :: ((t, t) -> Bool))
+
+unificationRules :: forall t.
+                    (
+                      Polymorphic t
+                    , Show t
+                    , Arbitrary t
+                    , Arbitrary (PolyType t)
+                    , Show (PolyType t)
+                    , Enum (PolyType t)
+                    )
+                    => Gen t -> Spec
+unificationRules _ = modifyMaxSuccess (* 20) $ describe "Unification rules and properties" $ do
+    prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
+        forAll (arbitrary' `suchThat` unifyR1Predicate)
+            (uncurry unifyR1 :: ((t, t) -> Bool))
+    prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
+        forAll (arbitrary' `suchThat` unifyR1Predicate)
+            (uncurry unifyR2 :: ((t, t) -> Bool))
     where
         {-
             Tweaked random generator that includes some type expressions that
@@ -81,7 +94,6 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
                 tvar <- arbitrary :: Gen (PolyType t)
                 l <- arbitrary :: Gen t
                 return (l, quantify tvar (poly tvar /-> poly tvar))
-
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
