@@ -72,11 +72,11 @@ unificationRules :: forall t.
                     , Enum (PolyType t)
                     )
                     => Gen t -> Spec
-unificationRules _ = modifyMaxSuccess (* 20) $ describe "Unification rules and properties" $ do
-    prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
+unificationRules _ = describe "Unification rules and properties" $ do
+    modifyMaxSuccess (* 20) $ prop "follows unification rule: when U(t, t') = V; V(t) ≣ V(t')" $
         forAll (arbitrary' `suchThat` unifyR1Predicate)
             (uncurry unifyR1 :: ((t, t) -> Bool))
-    prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
+    modifyMaxSuccess (* 5) $ prop "follows unification rule: when U(t, t') = V; ftvs(V(t) ∪ V(t')) ⊂ (ftvs(t) ∪ ftvs(t'))" $
         forAll (arbitrary' `suchThat` unifyR1Predicate)
             (uncurry unifyR2 :: ((t, t) -> Bool))
     where

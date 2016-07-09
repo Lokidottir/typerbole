@@ -121,5 +121,4 @@ instance (Ord v, Ord m) => Typecheckable v (SimplyTyped m) where
                 return (env, var'type /-> expr'type)
 
 instance (Data m, Arbitrary m) => Arbitrary (SimplyTyped m) where
-    -- TODO: remove instance of Data for t
-    arbitrary = sized generatorP
+    arbitrary = sized $ generatorPWith [alias (\() -> arbitrary :: Gen m)]

@@ -63,11 +63,18 @@ unify t1 t2 = do
     -- validate and order the substitutions
     topsortSubsG <$> substitutionGraph subs
 
+{-|
+    `unify` with `Gr` as the instance for DynGraph.
+-}
 unifyGr :: forall t p. (Polymorphic t, p ~ PolyType t)
       => t -> t
       -> Either [SubsErr Gr t p] [(t, p)]
 unifyGr = unify
 
+{-|
+    Partition a list of `Substitution`s into it's mutuals (first element of the tuple) and
+    it's substitutions (second element).
+-}
 partitionSubstitutions :: [Substitution t p] -> ([(p, p)], [(t, p)])
 partitionSubstitutions =
     partitionEithers . fmap (\case (Mutual x y) -> Left (x, y); (Substitution x y) -> Right (x, y);)
@@ -90,6 +97,9 @@ resolveMutuals subs =
     -- As a mutual substitution (a,b) means that a is b, every substitution
     -- of the form (T, a) must be duplicated to include (T, b), and every
     -- substitution of the form (M, b) must be duplicated to include (M, a).
+
+    -- If a future maintainer changes this to a foldl, they should reverse the
+    -- output of sortMutuals (if that's stil a part of this code).
     in foldr expandMutual subs' (sortMutuals subs' mutuals) where
         expandMutual :: (p, p) -> [(t, p)] -> [(t, p)]
         expandMutual (a, b) _subs = do
@@ -102,8 +112,10 @@ resolveMutuals subs =
             Reorder the mutuals so that they're resolved in an order that
             doesn't miss out on duplications.
 
-            NOTE: This is a bodge, a proper topsort of these needs to be done as a graph
-                  transform, probably.
+            NOTE: This is a bodge, a proper topsort of these needs to be done as part
+                  of a graph transform, probably.
+            NOTE: re: above. Extensive tests haven't really come up with a contradiction
+                  to this working, so maybe it's okay? I don't trust it though.
         -}
         sortMutuals :: [(t, p)] -> [(p, p)] -> [(p, p)]
         sortMutuals _subs = sortOn (\(a, b) -> max (subCount a) (subCount b)) where
