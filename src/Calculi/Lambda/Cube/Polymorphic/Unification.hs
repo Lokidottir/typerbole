@@ -42,21 +42,69 @@ import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
 import           Data.Tree
 
+{-
+    MODULE TODO:
+    We need a way to differeciate between two instances of the same type expression, otherwise
+    unifying two instances of the same type expression will frequently return cyclic substitution
+    errors.
+
+    Alternatively, this is fretting over nothing or is something writers of code using this library
+    should do themselves.
+-}
+
 
 {-|
-    `substitutions` but takes place in the Unify type.
+    `substitutions` but takes place in an Either that catches substitution errors.
 -}
 substitutionsM :: (Polymorphic t, p ~ PolyType t) => t -> t -> Either [SubsErr gr t p] [Substitution t p]
 substitutionsM t1 t2 = fmap (uncurry SubsMismatch) `first` substitutions t1 t2
 
-{-
-    Get the sequence of substitutions needed to unify two type expressions.
+{-|
+    This module's namesake function.
 
-    >>> unify ()
+    <https://en.wikipedia.org/wiki/Unification_(computer_science) Unification>
+    is an important step of typechecking polymorphic lambda calculi, taking two
+    type expressions and computing their differences to produce a sequence
+    of substitutions needed to make both type expressions equivalent.
+
+    This implementation computes a list of substitutions with the substitutions
+    to be applied first at the end of the list and the ones to be applied
+    last at the beginning. This is an artifact of how the reordering of the substitutions
+    works and can be remedied with a `reverse` if needed.
+
+    ===Behaviour
+        * Unifying two compatable type expressions
+
+            >>> unify (forall a. a) (A → B)
+            Right [(A → B, a)]
+
+            >>> unify (forall a b c. a → (b → c) → a) (forall x. x → (I → x) → G)
+            Right [(G, a), (G, c), (G, x), (I, b)]
+
+        * Unifying incompatable type expressions yeilds errors.
+
+            >>> unify (A) (B)
+            Left [SubsMismatch A B]
+
+        * Unifying a poly type with a type expression that contains that poly type yeilds a
+          cyclic substitution error.
+
+            >>> unify (a) (F a)
+            Left [CyclicSubstitution (mkGraph [(2,(F a))] [(2,2,(a))])]]
+            -- The above is a graph showing the cycle of (F a) trying to substitute it's own poly type (a)
+
+        * Unifying equivalent type expressions yeilds empty lists.
+
+            >>> unify (forall a. a → C) (forall x. x → C)
+            Right []
+
+            >>> unify (X → Y) (X → Y)
+            Right []
 -}
 unify :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
-      => t -> t
-      -> Either [SubsErr gr t p] [(t, p)]
+      => t -- ^ The first type expression
+      -> t -- ^ The second type expression
+      -> Either [SubsErr gr t p] [(t, p)] -- ^ The result from trying to unify both type expressions.
 unify t1 t2 = do
     -- Find the substitutions and partition them into mutuals and substitutions
     subs <- resolveMutuals <$> substitutionsM t1 t2
@@ -67,7 +115,8 @@ unify t1 t2 = do
     `unify` with `Gr` as the instance for DynGraph.
 -}
 unifyGr :: forall t p. (Polymorphic t, p ~ PolyType t)
-      => t -> t
+      => t
+      -> t
       -> Either [SubsErr Gr t p] [(t, p)]
 unifyGr = unify
 
@@ -132,22 +181,28 @@ resolveMutuals subs =
 
     * A type expression with poly types being ordered against one without them.
 
-        @(∀ a. a) ⊑ (X → Y) = True@
+        >>> (∀ a. a) ⊑ (X → Y)
+        True
 
     * A type expression being ordered against itself, displaying reflexivity.
 
-        @(X → X) ⊑ (X → X) = True@
+        >>> (X → X) ⊑ (X → X)
+        True
 
     * All type expressions are more specific than a type expression
       of just a single (bound or unbound) poly type.
 
-        @(a) ⊑ (a) = True@
+        >>> (a) ⊑ (a)
+        True
 
-        @(a) ⊑ (b) = True@
+        >>> (a) ⊑ (b)
+        True
 
-        @(a) ⊑ (X) = True@
+        >>> (a) ⊑ (X)
+        True
 
-        @(a) ⊑ (X → Y) = True@
+        >>> (a) ⊑ (X → Y)
+        True
 
         etc.
 -}
@@ -267,7 +322,7 @@ substitutionGraphM subs = do
     let typeExprs = nubSort $ subs >>= (\(t, p) -> [t, poly p])
     -- Build a list of type expressions and their bases.
     let basesList = (\t -> (t, typeVariables t)) <$> typeExprs
-                                -- ^ Why not freeTypeVariables?
+                                -- Why not freeTypeVariables?
                                 -- Because during random tests the case where a variable was
                                 -- quantified in different areas happened a bunch.
     -- Construct the edges
