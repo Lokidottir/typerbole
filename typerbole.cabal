@@ -27,9 +27,9 @@ library
                      , Calculi.Lambda.Cube.Dependent
                      , Calculi.Lambda.Cube.Typechecking
                      , Calculi.Lambda.Cube.TH
-                     , Calculi.Lambda.Cube.Systems.SystemF
-                     , Calculi.Lambda.Cube.Systems.SystemFOmega
-                     , Calculi.Lambda.Cube.Systems.SimplyTyped
+                     , Compiler.Typesystem.SystemF
+                     , Compiler.Typesystem.SystemFOmega
+                     , Compiler.Typesystem.SimplyTyped
                      , Data.Graph.Inductive.Helper
   build-depends:       base >= 4.7 && < 5
                      , containers >= 0.5 && < 0.6
