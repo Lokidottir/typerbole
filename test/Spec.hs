@@ -6,9 +6,9 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.Polymorphic.Unification
-import           Calculi.Lambda.Cube.Systems.SimplyTyped  as ST
-import           Calculi.Lambda.Cube.Systems.SystemF      as SF
-import           Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
+import           Compiler.Typesystem.SimplyTyped  as ST
+import           Compiler.Typesystem.SystemF      as SF
+import           Compiler.Typesystem.SystemFOmega as SFO
 import           Data.Maybe
 import           Data.Generics
 import           Data.Semigroup
