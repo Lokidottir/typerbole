@@ -1,5 +1,7 @@
 sudo: false
 
+addons: { apt: packages }
+
 # Caching so the next build will be fast too.
 cache:
     directories:
