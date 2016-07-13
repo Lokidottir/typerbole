@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Calculi.Lambda.Cube.Systems.SimplyTyped where
+module Compiler.Typesystem.SimplyTyped where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType

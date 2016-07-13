@@ -206,7 +206,7 @@ resolveMutuals subs =
 
         etc.
 -}
-(⊑) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Bool
+(⊑) :: (Polymorphic t) => t -> t -> Bool
 t ⊑ t' = fromRight False $ do
     subs <- resolveMutuals <$> substitutionsM t' t
     applySubs <- applyAllSubsGr subs
@@ -217,7 +217,7 @@ infix 4 ⊑
 {-|
     Non-unicode @⊑@.
 -}
-(\<) :: (Polymorphic t, p ~ PolyType t) => t -> t -> Bool
+(\<) :: (Polymorphic t) => t -> t -> Bool
 (\<) = (⊑)
 
 infix 4 \<

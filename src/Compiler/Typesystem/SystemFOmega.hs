@@ -1,11 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
-module Calculi.Lambda.Cube.Systems.SystemFOmega where
+module Compiler.Typesystem.SystemFOmega where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
-import           Calculi.Lambda.Cube.Systems.SimplyTyped (SimplyTyped)
+import           Compiler.Typesystem.SimplyTyped (SimplyTyped)
 import qualified Language.Haskell.TH.Lift as TH
 import           Data.Bifoldable
 import           Data.Bifunctor.TH

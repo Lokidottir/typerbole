@@ -33,6 +33,13 @@ data LambdaExpr v t =
     | Lambda (v, t) (LambdaExpr v t)          -- ^ A variable definition and a function body
     deriving (Eq, Ord, Show, Data)
 
+{- Sketching out possible changes to LambdaExpr -}
+data LambdaTerm c v t =
+      Variable v
+    | Constant c
+    | Apply_ (LambdaTerm c v t) (LambdaTerm c v t)
+    | Lambda_ (v, t) (LambdaTerm c v t) (LambdaTerm c v t)
+
 type LetDeclr v t = ((v, t), LambdaExpr v t)
 
 deriveBifunctor ''LambdaExpr

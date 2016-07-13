@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module Calculi.Lambda.Cube.Systems.SystemF where
+module Compiler.Typesystem.SystemF where
 
 import           Data.Bifunctor.TH
 import           Calculi.Lambda

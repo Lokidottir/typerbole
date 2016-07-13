@@ -7,9 +7,9 @@ module Calculi.Lambda.Cube.TH (
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as TH
 import qualified Language.Haskell.TH.Syntax as TH
-import qualified Calculi.Lambda.Cube.Systems.SystemFOmega as SFO
-import qualified Calculi.Lambda.Cube.Systems.SystemF as SF
-import qualified Calculi.Lambda.Cube.Systems.SimplyTyped as STLC
+import qualified Compiler.Typesystem.SystemFOmega as SFO
+import qualified Compiler.Typesystem.SystemF as SF
+import qualified Compiler.Typesystem.SimplyTyped as STLC
 import Text.Megaparsec
 import Calculi.Lambda.Cube
 import Data.List

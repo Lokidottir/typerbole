@@ -4,7 +4,6 @@ module Calculi.Lambda.Cube.HigherOrder where
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Calculi.Lambda.Cube.Typechecking
-import           Calculi.Lambda.Cube.Systems.SimplyTyped as SimplyTyped
 import qualified Data.Map                                as Map
 
 type KindEnvironment t = Map.Map t (Kindedness t)
