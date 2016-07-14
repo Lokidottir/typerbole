@@ -1,8 +1,8 @@
-### Overview of Lambda Cube typesystems
+# Overview of Lambda Cube typesystems
 
-#### Simply-typed lambda calculus
+## Simply-typed lambda calculus
 
-The simply-typed lambda calculus is the simplest and least expressive typesystem of the lambda cube. In the simply-typed lambda calculus, there are only two constructs: Mono types (such as `Int`, `Bool`, or whatever else is defined) and the `->` constructor.
+The simply-typed lambda calculus is, well, *the most simple typesystem* in the lambda cube. It lets you have type constants[1] (`Int`, `Bool`, `String` etc.) and the function arrow `->` to make functions from one type to another.
 
 ```haskell
 -- Functions and values in the simply-typed lambda calculus.
@@ -12,13 +12,18 @@ zero = 0
 isFive : Int -> Bool
 isFive 5 = True
 isFive _ = False
+
+thisFunctionTakesAFunction : (Int -> String) -> String
+thisFunctionTakesAFunction f = f 20
 ```
 
-On it's own the simply-typed lambda calculus lacks the ability to express recursion without typerrors or functions and values whose type is generic, and many other useful constructs. Each axis of the lambda cube adds different kinds of expressiveness, allowing more and more programs to be validated at compile time safely.
+On it's own, the simply-typed lambda calculus is alright for simple programs. Additionally, if a way to do recursion isn't provided in languages using the STLC then it's proven that program will terminate (strong normalisation).
 
-#### Polymorphism
+It's the simplest typesystem in the cube though, there's a limit to what it can express. The other axis of the lambda cube aim to make more programs able to be written in a typesafe way, using this typesystem as a base.
 
-Polymorphism allows you to write type expressions that expose poly types (also referred to as type variables). In a non-polymorphic type expression associated with the identity function we'd need to declare a new identity function for every type.
+## Polymorphism
+
+When working in a simply-typed lambda calculus, you can end up writing a lot of duplicate code just because of different types. Like below, an example of writing identity functions for every type (there's an infinite number of them).
 
 ```haskell
 -- Identity functions in the simply-typed lambda calculus.
@@ -34,7 +39,9 @@ identityIntToInt x = x
 -- Etc. Do for the infinite number of types that exist.
 ```
 
-Instead, a single identity function can work **for all** types.
+Wouldn't it be useful if we could abstract the type away and have a **variable** type that lets us have a single identity function **for all** types like we do for values in the lambda calculus with `\a -> ...`?
+
+So we do just that in the polymorphic lambda calculus, a type variable[2] stands in, able to be replaced by any other type.
 
 ```haskell
 -- identity function (just the one!) in a polymorphic lambda calculus.
@@ -42,7 +49,28 @@ identity : forall a. a -> a
 identity x = x
 ```
 
-#### Higher-order types
+And we can use this on all types:
+
+```haskell
+-- Ints...
+> identity 5
+5
+-- ...and Strings...
+> identity "Type theory is pretty"
+"Type theory is pretty"
+-- ...and Bools...
+> identity False
+False
+-- ...and functions!
+> identity ((\i -> i + 1) : Int -> Int)
+(\i -> i + 1) : Int -> Int
+```
+
+#### A note on typeclasses
+
+The idea pf typeclass constraints (`Show a => a -> String` and the like) is an extension or syntactic sugar for the polymorphic lambda calculus, and isn't a part of polymorphic lambda calculi by default. They allow a lot more abstraction and generalisation and are not covered in this document.
+
+## Higher-order types
 
 Higher-order types allow for compound types (Like `IO String` or `Set Int` in haskell).
 
@@ -54,4 +82,19 @@ setOfInt : Set Int
 setOfInt = fromList [1,2,3,4,5]
 ```
 
-#### Dependent types
+## Dependent types
+
+Dependent types lets us have values as types. This can seem confusing, but when using typerbole you can
+
+***
+##### Footnotes
+
+[1] In typerbole's source code type constants are called mono types because of the lambda calculus implementation uses the names `Var[iable]` (and `Constant`, or at least it's intended to be used in future).
+
+[2] In typerbole's source type variables are reffered to as poly types, see [1]
+
+***
+
+##### Contribution
+
+This is an educational document, pull requests for better (though accessable) explainations, typos, citations, or signposting to more information for those interested are welcome.
