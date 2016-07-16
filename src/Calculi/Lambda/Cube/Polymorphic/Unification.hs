@@ -14,6 +14,10 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
     , unvalidatedApplyAllSubs
     , resolveMutuals
     -- * Substitution validation
+    -- ** Substitution error datatypes
+    , SubsErr(..)
+    , ConflictTree
+    -- ** Validation and analysis functions
     , substitutionGraph
     , substitutionGraphGr
     , substitutionGraphM
@@ -52,6 +56,32 @@ import           Data.Tree
     should do themselves.
 -}
 
+{-|
+    Errors in poly type substitution.
+-}
+data SubsErr gr t p =
+      MultipleSubstitutions (ConflictTree t p)
+    -- ^ There are multiple possible substitutions, the first argument here
+    -- is the type that has multiple substitutions and the second is the
+    -- list of all the conflicting substitutions' paths.
+    | CyclicSubstitution (gr t p)
+    -- ^ There is a cycle of substitutions.
+    | SubsMismatch t t
+    -- ^ A substitution between two incompatable type expressions
+    -- was attempted. (i.e. @`substitutions` (X) (Y → Y)@)
+    deriving (Eq, Show, Read)
+
+{-|
+    A substitution conflict's root, with a tree of types substituting
+    variables as the first element [1] and the second element being the
+    type where these clashing substitutions converge.
+
+    [1]: to be read that the first element of the tuple is a forest of
+    substitutions leading the final type expression with a substitution conflict.
+
+    TODO: Put a diagram here instead.
+-}
+type ConflictTree t p = ([Tree (t, [p])], t)
 
 {-|
     `substitutions` but takes place in an Either that catches substitution errors.

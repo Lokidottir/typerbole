@@ -10,7 +10,8 @@ module Calculi.Lambda.Cube.SimpleType (
     , order
     -- * Typechecking
     , SimpleTypingContext(..)
-    , vars
+    , variables
+    , constants
     , allTypes
     -- * Other functions
     , prettyprintST
@@ -31,9 +32,16 @@ import           Data.Monoid
 import qualified Data.Set        as Set
 import           Test.QuickCheck
 
-data SimpleTypingContext v t = SimpleTypingContext {
-      _vars     :: Map.Map v t
+{-|
+    A simple typing context.
+-}
+data SimpleTypingContext c v t = SimpleTypingContext {
+      _variables :: Map.Map v t
+      -- ^ A mapping of variables to types.
+    , _constants :: Map.Map c t
+      -- ^ A mapping of constants to types.
     , _allTypes :: Set.Set t
+      -- ^ All the base types in scope.
 } deriving (Show, Read, Eq, Ord)
 
 makeLenses ''SimpleTypingContext
@@ -153,12 +161,12 @@ isBase = not . isFunction
 {-|
     Function retrives a set of all base types in the given lambda expression.
 -}
-basesOfExpr :: SimpleType t => LambdaExpr v t -> Set.Set t
+basesOfExpr :: SimpleType t => LambdaTerm c v t -> Set.Set t
 basesOfExpr = bifoldr (\_ st -> st) (\t st -> bases t <> st) Set.empty
 
 {-|
     Get a typing environment that assumes all the base types in an expression
     are valid.
 -}
-envFromExpr :: SimpleType t => LambdaExpr v t -> SimpleTypingContext v t
-envFromExpr = SimpleTypingContext Map.empty . basesOfExpr
+envFromExpr :: SimpleType t => LambdaTerm c v t -> SimpleTypingContext c v t
+envFromExpr = SimpleTypingContext Map.empty Map.empty . basesOfExpr

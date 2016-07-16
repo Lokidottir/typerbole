@@ -1,14 +1,16 @@
 # Maintainance and Contribution
 
-## Design
-
-This library was influenced by [Subhask](https://github.com/mikeizbicki/subhask), though using it is avoided in this project for the sake of not making the library more complex than it already is.
-
-### Deep-seated problems
+## Deep-seated problems
 
 This library was developed by me (@Lokidottir, at time of writing) while I was learning type theory as a personal project, in fairly deep isolation from anyone who had already studied it. There's a good chance my assumptions about what things mean conflicts with the literature, I would apprecite any issues or pull requests made pointing out or addressing issues related to this.
 
 Additionally, this library uses an extensive number of GHC extensions. While this has made this project as flexible as it is, it also means that compile times are awful and that some ideas such as Type Families or even just the appearence of `forall`s may not be familiar to people who have learnt plain Haskell2010.
+
+## Style
+
+### Influence
+
+This library was influenced by [Subhask](https://github.com/mikeizbicki/subhask), though using it is avoided in this project for the sake of not making the library more complex than it already is.
 
 ### Comments
 
@@ -42,6 +44,10 @@ t ⊑ t' =
         return (t' ≣ applySubs t)
 ```
 
+## Contribution
+
 ### New typesystems
 
-Introducing new typesystem classifications as typeclasses is welcomed, there's not yet a concrete structure to how the 
+Introducing new typesystem instances under `Compiler.Typesystem` is welcomed.
+
+### Utility

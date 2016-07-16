@@ -4,7 +4,7 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 
 {-|
-    Typesystems which can have values at the type-level.
+    Typesystems which can have values in their types.
 -}
 class SimpleType t => Dependent t where
 

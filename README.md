@@ -1,10 +1,6 @@
 # typerbole
 
-Type theory that isn't so scary.
-
-## Purpose
-
-This library came from wanting to have a framework for developing typesystems that wasn't too restrictive and also signposted people unfamiliar with type theory.
+A library classifying typesystems with typeclasses.
 
 ## The Library
 
@@ -16,8 +12,8 @@ This library uses a minimal lambda calculus representation as an AST to manipula
 data LambdaTerm c v t =
       Variable v
     | Constant c
-    | Apply (LambdaTerm v t) (LambdaTerm v t)
-    | Lambda (v, t) (LambdaTerm v t)
+    | Apply (LambdaTerm c v t) (LambdaTerm c v t)
+    | Lambda (v, t) (LambdaTerm c v t)
 ```
 
 An important part of this datatype is the parameter `t`, which represents the type system used. With this being a parameterized part of the AST, we can slot in any typesystem we choose!

@@ -1,7 +1,6 @@
 module Calculi.Lambda (
       -- * Typed Lambda Calculus AST.
-      LambdaExpr(..)
-    , LambdaTerm(..)
+      LambdaTerm(..)
     , UntypedLambdaExpr
       -- ** Analysis Helpers
     , freeVars
@@ -26,35 +25,16 @@ import qualified Data.Set                    as Set
 import           Test.QuickCheck
 
 {-|
-    A simple typed lambda calculus AST.
--}
-data LambdaExpr v t =
-      Var v                                   -- ^ A reference to a variable
-    | Apply (LambdaExpr v t) (LambdaExpr v t) -- ^ An application of one expression to another
-    | Lambda (v, t) (LambdaExpr v t)          -- ^ A variable definition and a function body
-    deriving (Eq, Ord, Show, Data)
-
-deriveBifunctor ''LambdaExpr
-deriveBifoldable ''LambdaExpr
-deriveBitraversable ''LambdaExpr
-
-instance (Arbitrary v, Data v, Arbitrary t, Data t) => Arbitrary (LambdaExpr v t) where
-    -- TODO: Remove the instances of Data for v and t
-    arbitrary = sized generatorP
-
-type UntypedLambdaExpr v = LambdaExpr v ()
-
-{-|
     A simple, typed lambda calculus AST with constants.
 -}
 data LambdaTerm c v t =
       Variable v
       -- ^ A reference to a variable.
     | Constant c
-      -- ^ A constant value, such as @""@.
-    | Apply_ (LambdaTerm c v t) (LambdaTerm c v t)
+      -- ^ A constant value, such as literals or constructors.
+    | Apply (LambdaTerm c v t) (LambdaTerm c v t)
       -- ^ An application of one expression to another.
-    | Lambda_ (v, t) (LambdaTerm c v t)
+    | Lambda (v, t) (LambdaTerm c v t)
       -- ^ A lambda expression, with a variable definition and
       -- a function body.
     deriving (Eq, Ord, Show, Data)
@@ -69,6 +49,8 @@ instance (Arbitrary c, Data c,
     arbitrary = sized generatorSR
 
 type LetDeclr c v t = ((v, t), LambdaTerm c v t)
+
+type UntypedLambdaExpr c v = LambdaTerm c v ()
 
 {-|
     Given the contents of a let expression's declarations, generate a graph
@@ -128,7 +110,7 @@ unlet lets expr =
         -- This is what turns the cycles found in tsorted
         -- to let expressions and the non-cycle nodes into
         -- lambda-apply name scoping.
-        unlet' (declr, body) lexpr = Lambda_ declr lexpr `Apply_` body
+        unlet' (declr, body) lexpr = Lambda declr lexpr `Apply` body
     in if null cycles then Right (foldr unlet' expr lets') else Left cycles
 
 {-|
@@ -138,10 +120,10 @@ freeVars :: Ord v => LambdaTerm c v t -> Set.Set v
 freeVars = \case
     Variable v          -> Set.singleton v
     Constant _          -> Set.empty
-    Apply_ fun arg      ->
+    Apply fun arg      ->
         -- Union the free variables of both parts of the Apply
         freeVars fun <> freeVars arg
-    Lambda_ (v, _) expr ->
+    Lambda (v, _) expr ->
         -- remove the variable defined by the lambda from the set of free
         -- variables found in the body.
         Set.delete v (freeVars expr)

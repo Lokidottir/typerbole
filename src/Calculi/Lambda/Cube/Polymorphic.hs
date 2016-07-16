@@ -16,9 +16,6 @@ module Calculi.Lambda.Cube.Polymorphic (
     , boundTypeVariables
     , typeConstants
     , isPolyType
-    -- * Substitution Validation
-    , ConflictTree
-    , SubsErr(..)
     -- ** Typechecking context
     , SubsContext(..)
     , SubsContext'
@@ -28,7 +25,6 @@ module Calculi.Lambda.Cube.Polymorphic (
 ) where
 
 import           Calculi.Lambda.Cube.SimpleType
-import           Calculi.Lambda.Cube.Typechecking
 import           Data.Either.Combinators
 import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set

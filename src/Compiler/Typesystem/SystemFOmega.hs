@@ -101,18 +101,12 @@ instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
     type Kindsystem (SystemFOmega m p) = (SimplyTyped Star)
 
     kind = \case
-        m@Mono{}      -> Var m
+        m@Mono{}      -> Constant m
         -- The function arrow (→ in the psudocode) is a mono type of the kind (* -> * -> *)
-        FunctionArrow -> Var FunctionArrow
-        p@Poly{}      -> Var p
-        Forall p sf   -> Lambda (Poly p, star) (kind sf)
+        FunctionArrow -> Constant FunctionArrow
+        p@Poly{}      -> Constant p
+        Forall p sf   -> kind sf
         TypeAp tl tr  -> Apply (kind tl) (kind tr)
-
-    unkind = \case
-        Var x                 -> Just x
-        Apply x y             -> TypeAp <$> unkind x <*> unkind y
-        Lambda (Poly p, _) sf -> Forall p <$> unkind sf
-        _                     -> Nothing
 
     typeap = TypeAp
     untypeap (TypeAp a b) = Just (a, b)

@@ -17,14 +17,14 @@ data Star =
     deriving (Eq, Ord, Show, Read)
 
 {-|
-    Typed lambda calculus target of Kind
+    The representation to be typechecked at the kind level.
 -}
-type Kindedness t = LambdaExpr t (Kindsystem t)
+type Kindedness t = LambdaTerm t () (Kindsystem t)
 
 {-|
     Typeclass for higher-order types.
 -}
-class (Typecheckable t (Kindsystem t), SimpleType t) => HigherOrder t where
+class (Typecheckable t () (Kindsystem t), SimpleType t) => HigherOrder t where
     {-|
         The representation of kind constants.
     -}
@@ -79,10 +79,10 @@ class (Typecheckable t (Kindsystem t), SimpleType t) => HigherOrder t where
     Typecheck a type expression's kindedness.
 -}
 kindcheck :: forall t ksys. (Kindsystem t ~ ksys, HigherOrder t)
-          => TypingContext t ksys                -- ^ A typing context for typechecking
-          -> t                                   -- ^ A type expression to kindcheck
-          -> Either [TypeError t ksys]
-                    (TypingContext t ksys, ksys) -- ^ The result.
+          => TypingContext t () ksys                -- ^ A typing context for typechecking
+          -> t                                      -- ^ A type expression to kindcheck
+          -> Either [TypeError t () ksys]
+                    (TypingContext t () ksys, ksys) -- ^ The result.
 kindcheck ctx texpr = typecheck ctx (kind texpr)
 
 {-|

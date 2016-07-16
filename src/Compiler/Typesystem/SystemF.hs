@@ -119,49 +119,57 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 {-|
     Error sum not within Eithers because those (GHC) type errors are messy.
 -}
-data SystemFErr v t =
-      SFNotKnownErr (NotKnownErr v t)
+data SystemFErr c v t =
+      SFNotKnownErr (NotKnownErr c v t)
     | SFSimpleTypeErr (SimpleTypeErr t)
     | SFSubsErr (SubsErr Gr t (PolyType t))
 
-deriving instance (Polymorphic t, Eq v) => Eq (SystemFErr v t)
-deriving instance (Polymorphic t, Show v, Show t, Show (PolyType t)) => Show (SystemFErr v t)
+deriving instance (Polymorphic t, Eq v, Eq c) => Eq (SystemFErr c v t)
+deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => Show (SystemFErr c v t)
 
-data SystemFContext v t p = SystemFContext {
+data SystemFContext c v t p = SystemFContext {
       _polyctx :: SubsContext t p
       -- ^ The context for Polymorphic related information
-    , _stlcctx :: SimpleTypingContext v t
+    , _stlcctx :: SimpleTypingContext c v t
       -- ^ The context for Simply-typed related information.
 } deriving (Eq, Ord, Show)
 
 makeLenses ''SystemFContext
 
-instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
+instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable c v (SystemF m p) where
 
-    type TypingContext v (SystemF m p) = (SystemFContext v (SystemF m p) p)
+    type TypingContext c v (SystemF m p) = (SystemFContext c v (SystemF m p) p)
 
-    -- Sum of NotKnownErr, SimpleTypeErr, and SubsErr, wrapped in ErrorContext
-    type TypeError v (SystemF m p) =
+    type TypeError c v (SystemF m p) =
         ErrorContext'
+            c
             v
             (SystemF m p)
-            (SystemFErr v (SystemF m p))
+            (SystemFErr c v (SystemF m p))
 
     typecheck env _expr = runTypecheck env (typecheck' _expr) where
         {-
             Using a State type to pass around our environment
         -}
-        typecheck' :: LambdaExpr v (SystemF m p) -> Typecheck v (SystemF m p) (SystemF m p)
+        typecheck' :: LambdaTerm c v (SystemF m p) -> Typecheck c v (SystemF m p) (SystemF m p)
         typecheck' __expr =
             -- Append the current expression to any ErrorContexts
             flip catchError (throwError . fmap (expression %~ (__expr :)))
             $ case __expr of
-                Var v -> do
+                Variable v -> do
                     -- Query the type of the variable
-                    t <- Map.lookup v <$> use (stlcctx.vars)
+                    t <- Map.lookup v <$> use (stlcctx.variables)
                     -- Nameerror action in case v doesn't exist within the typing context.
                     let nameErr = throwErrorContext [] (SFNotKnownErr (UnknownVariable v))
                     -- If v's type (t) is Nothing then nameerror, otherwise just return it.
+                    maybe nameErr return t
+
+                Constant c ->  do
+                    -- Query the type of the constant
+                    t <- Map.lookup c <$> use (stlcctx.constants)
+                    -- Nameerror action in case c doesn't exist within the typing context.
+                    let nameErr = throwErrorContext [] (SFNotKnownErr (UnknownConstant c))
+                    -- If c's type (t) is Nothing then nameerror, otherwise just return it.
                     maybe nameErr return t
 
                 Apply fun arg -> do
@@ -192,7 +200,7 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
                     oldstate <- get
                     -- Register the variable v to have the type t in the current state
                     -- and typecheck the lambda's body with that state.
-                    stlcctx.vars %= Map.insert v t
+                    stlcctx.variables %= Map.insert v t
                     -- Also register all the outmost declared poly types
                     stlcctx.allTypes %= (outmostDeclaredPolys t <>)
                     -- Typecheck the lambda's expression with this added information
@@ -201,11 +209,6 @@ instance (Ord v, Ord m, Ord p) => Typecheckable v (SystemF m p) where
                     put oldstate
                     -- Return the type of this expression.
                     return (t /-> expr'type)
-
-        throwErrorContext exprStack err = get >>= (\env' -> throwError [ErrorContext exprStack env' err])
-
-        throwErrorContexts exprsAndErrs =
-            get >>= (\env' -> throwError (uncurry (flip ErrorContext env') <$> exprsAndErrs))
 
         calcUnknownTypes t types =
             SFNotKnownErr . UnknownType <$> Set.toList (Set.difference (bases t) types)

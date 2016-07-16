@@ -49,14 +49,20 @@ instance Ord m => SimpleType (SimplyTyped m) where
 
     mono = Mono
 
-instance (Ord v, Ord m) => Typecheckable v (SimplyTyped m) where
-    type TypingContext v (SimplyTyped m) = (SimpleTypingContext v (SimplyTyped m))
+data SimplyTypedErr c v t =
+      STNotKnownErr (NotKnownErr c v t)
+    | STSimpleTypeErr (SimpleTypeErr t)
+    deriving (Eq, Ord, Show)
 
-    type TypeError v (SimplyTyped m) =
+instance (Ord v, Ord m) => Typecheckable c v (SimplyTyped m) where
+    type TypingContext c v (SimplyTyped m) = (SimpleTypingContext c v (SimplyTyped m))
+
+    type TypeError c v (SimplyTyped m) =
         -- Using an ErrorContext because it can hold a lot of information.
         ErrorContext'
+            c
             v
-            (SimplyTyped m) (NotKnownErr v (SimplyTyped m) :+: SimpleTypeErr (SimplyTyped m))
+            (SimplyTyped m) (SimplyTypedErr c v (SimplyTyped m))
 
     typecheck env _expr =
         -- Always add the current expression to all the errors that have occurred
@@ -67,12 +73,12 @@ instance (Ord v, Ord m) => Typecheckable v (SimplyTyped m) where
                 Case of a LC variable, not really typechecking but instead
                 checking that the variable name is in scope.
             -}
-            Var v ->
+            Variable v ->
                 let -- If there's an error on the var lookup, return this as the error.
-                    err = Left [ErrorContext [] env (Left (UnknownVariable v))]
+                    err = Left [ErrorContext [] env (STNotKnownErr (UnknownVariable v))]
                     -- If it succeeds in it's lookup, pipe the result into a tuple in a Right value.
                     success = (Right . (,) env)
-                in maybe err success (Map.lookup v (_vars env))
+                in maybe err success (Map.lookup v (_variables env))
 
             {-
                 Application of two expressions.
@@ -91,12 +97,12 @@ instance (Ord v, Ord m) => Typecheckable v (SimplyTyped m) where
                         case reify fun'type of
                             Nothing       ->
                                 -- The first expression's type wasn't a function type.
-                                Left [ErrorContext [fun] env (Right $ NotAFunction fun'type)]
+                                Left [ErrorContext [fun] env (STSimpleTypeErr $ NotAFunction fun'type)]
                             Just (funarg'type, funret'type)
                                 | funarg'type /= arg'type ->
                                     -- The type of the argument expression doesn't match the expected
                                     -- type of the function expression.
-                                    Left [ErrorContext [fun] env (Right $ UnexpectedType funarg'type arg'type)]
+                                    Left [ErrorContext [fun] env (STSimpleTypeErr $ UnexpectedType funarg'type arg'type)]
                                 | otherwise ->
                                     -- succeeded in typechecking.
                                     Right (env, funret'type)
@@ -109,12 +115,12 @@ instance (Ord v, Ord m) => Typecheckable v (SimplyTyped m) where
                 -- as every type should be declared by the environment
                 -- before appearing in an expression.
                 let unknownTypes = Set.toList $ Set.difference (bases var'type) (_allTypes env)
-                let errFun t = ErrorContext [] env (Left $ UnknownType t)
+                let errFun t = ErrorContext [] env (STNotKnownErr$ UnknownType t)
                 -- If there are unknown types, error on them.
                 unless (null unknownTypes) . Left $ errFun <$> unknownTypes
                 -- If we get ths far, then var'type was valid
                 -- Set a new typing context with var brought into scope
-                let env' = env { _vars = Map.insert var var'type (_vars env) }
+                let env' = env { _variables = Map.insert var var'type (_variables env) }
                 -- Typecheck the lambda's body
                 (_, expr'type) <- typecheck env' expr
                 -- Return the environment and the type of the lambda expression.
