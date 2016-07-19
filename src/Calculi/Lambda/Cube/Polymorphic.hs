@@ -7,7 +7,7 @@ module Calculi.Lambda.Cube.Polymorphic (
       Polymorphic(..)
     , Substitution(..)
     -- ** Notation and related functions
-    , areEquivalent
+    , areAlphaEquivalent
     , (≣)
     , (\-/)
     , generalise
@@ -202,10 +202,10 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     freeTypeVariables :: t -> Set.Set t
 
 {-|
-    Infix `areEquivalent`
+    Infix `areAlphaEquivalent`
 -}
 (≣) :: Polymorphic t => t -> t -> Bool
-(≣) = areEquivalent
+(≣) = areAlphaEquivalent
 
 infix 4 ≣
 
@@ -264,17 +264,17 @@ generalise' = generalise Set.empty
     being made being symbolically identical, where binds and type variables appear in
     the same place but may have different names (this is Alpha Equivalence).
 
-    >>> areEquivalent (∀ a. X → a) (∀ z. X → z)
+    >>> areAlphaEquivalent (∀ a. X → a) (∀ z. X → z)
     True
 
-    >>> areEquivalent (M → X) (M → X)
+    >>> areAlphaEquivalent (M → X) (M → X)
     True
 
-    >>> areEquivalent (∀ a. a) (∀ z. z → z)
+    >>> areAlphaEquivalent (∀ a. a) (∀ z. z → z)
     False
 -}
-areEquivalent :: forall t. Polymorphic t => t -> t -> Bool
-areEquivalent x y = fromRight False $ all isMutual <$> subs where
+areAlphaEquivalent :: forall t. Polymorphic t => t -> t -> Bool
+areAlphaEquivalent x y = fromRight False $ all isMutual <$> subs where
     subs = substitutions x y
 
     isMutual (Mutual _ _) = True

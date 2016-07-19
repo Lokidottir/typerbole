@@ -27,6 +27,7 @@ library
                      , Calculi.Lambda.Cube.Dependent
                      , Calculi.Lambda.Cube.Typechecking
                      , Calculi.Lambda.Cube.TH
+                     , Compiler.Typesystem.Hask
                      , Compiler.Typesystem.SystemF
                      , Compiler.Typesystem.SystemFOmega
                      , Compiler.Typesystem.SimplyTyped

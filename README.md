@@ -22,7 +22,7 @@ An important part of this datatype is the parameter `t`, which represents the ty
 
 The lambda cube describes the properties of a number of typesystems, an overview can be found [here](./lambdacube-overview.md).
 
-The lambda cube is the basis for the library's classification of typesystems, a typeclass hierarchy
+The lambda cube is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
 
 ***
 
@@ -37,10 +37,10 @@ The lambda cube is the basis for the library's classification of typesystems, a 
 
 - [ ] Put together a working travis file.
 - [ ] Document the type expression psudocode
-- [ ] Design a typeclass for typesystems with haskell-like (`Num a => a`) typeclass constraints.
-- [ ] Add constants to the lambda calculus AST.
+- [ ] Design a typeclass for typesystems with constraints (`Num a => ...`, `a ~ T` etc).
 - [ ] Provide a default way of evaluating lambda expressions.
 - [ ] Make the quasiquoters use the lambda cube typeclasses instead of specific typesystem implementations.
 - [ ] Have a typeclass for evaluatable calculi (Kappa calculus and the like). This may be unnecessary abstraction.
 - [ ] Subhask-style automated test writing.
 - [ ] More formally represent typing rules instead of just implementing typesystems ad-hoc and hoping they are at least equivalent (Would require a significant amount of refectoring, if it gets to a point where the library becomes less accessable then stick with the ad-hoc approach).
+- [ ] Explore homotopy type theory

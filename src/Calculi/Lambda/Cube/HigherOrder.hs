@@ -26,28 +26,15 @@ type Kindedness t = LambdaTerm t () (Kindsystem t)
 -}
 class (Typecheckable t () (Kindsystem t), SimpleType t) => HigherOrder t where
     {-|
-        The representation of kind constants.
+        The typesystem of the typesystem.
     -}
     type Kindsystem t :: *
 
     {-|
-        Construct a kind expression describing the application and abstraction of
-        types in a given type. Not given a kind enviroment as given a kindedness
-        expression, this information can be derived generally.
-
-        @`kind` (∀ a. a) = (Lambda (a, star) a)@
-
-        If inference elsewhere found out that @(∀ a. a)@'s kind wasn't @*@ and instead
-        @* → *@ then it could rewrite this expression to match. What matters is that
-        the type is in a form that can be manipulated and checked in a general manner.
+        Turn a type expression into a lambda expression describing how the types
+        are applied to eachother.
     -}
     kind :: t -> Kindedness t
-
-    {-|
-        Translate a kindedness expression back to a type, functionally the inverse of
-        `kind`.
-    -}
-    unkind :: Kindedness t -> Maybe t
 
     {-|
         More generalised form of `abstract` to work on all type operators, not
@@ -71,9 +58,6 @@ class (Typecheckable t () (Kindsystem t), SimpleType t) => HigherOrder t where
         @`untypeap` X       = Nothing@
     -}
     untypeap :: t -> Maybe (t, t)
-    untypeap x = case kind x of
-        Apply a b -> (,) <$> unkind a <*> unkind b
-        _         -> Nothing
 
 {-|
     Typecheck a type expression's kindedness.
