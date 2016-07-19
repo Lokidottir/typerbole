@@ -6,6 +6,7 @@ module Calculi.Lambda.Cube.SimpleType (
     -- * Typeclass for λ→
       SimpleType(..)
     -- ** Notation and related functions
+    , (====)
     , (/->)
     , order
     -- * Typechecking
@@ -108,6 +109,19 @@ class (Ord t) => SimpleType t where
         the lines of "Mono m".
     -}
     mono :: MonoType t -> t
+
+    {-|
+        Type equivalence, for simple typesystems this might be `(==)` but for polymorphic or
+        dependent typesystems this might also include alpha equivalence or reducing the
+        type expressions to normal form before performing another.
+    -}
+    equivalent :: t -> t -> Bool
+
+{-|
+    Infix `equivalent`.
+-}
+(====) :: SimpleType t => t -> t -> Bool
+(====) = equivalent
 
 {-|
     Infix `abstract` with the appearence of @↦@, which is used to denote function

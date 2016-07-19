@@ -73,6 +73,8 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     mono = Mono
 
+    equivalent = areAlphaEquivalent
+
 instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 
     type PolyType (SystemF m p) = p
@@ -149,7 +151,7 @@ instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable c v (SystemF m p) where
 
     typecheck env _expr = runTypecheck env (typecheck' _expr) where
         {-
-            Using a State type to pass around our environment
+            Using thhe
         -}
         typecheck' :: LambdaTerm c v (SystemF m p) -> Typecheck c v (SystemF m p) (SystemF m p)
         typecheck' __expr =

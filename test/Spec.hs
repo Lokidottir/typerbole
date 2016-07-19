@@ -97,8 +97,6 @@ unificationRules _ = describe "Unification rules and properties" $ do
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
-    prop "follows kind-unkind inverse law" $
-        ((\ !ty -> unkind (kind ty) == Just ty) :: t -> Bool)
     prop "follows typeap-untypeap inverse law" $ (typeapInverse ::  t -> t -> Bool)
 
 {-|
@@ -116,6 +114,12 @@ typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$
 
 typeOrderingRule :: (Enum e, Polymorphic t, PolyType t ~ e) => t -> Bool
 typeOrderingRule !t = poly (toEnum 9999) ⊑ t
+
+{-
+    Assert that `abstract` lifts all of the quantifiers to the result.
+-}
+liftQuantifiersRule :: (Polymorphic t, PolyType t ~ p) => t -> p -> Bool
+liftQuantifiersRule t p = t /-> quantify p (poly p) == quantify p (t /-> poly p)   
 
 unifyR1 :: forall t e. (Enum e, Polymorphic t, Show t, PolyType t ~ e) => t -> t -> Bool
 unifyR1 !t1 !t2 =

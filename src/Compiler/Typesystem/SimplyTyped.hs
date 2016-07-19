@@ -49,6 +49,8 @@ instance Ord m => SimpleType (SimplyTyped m) where
 
     mono = Mono
 
+    equivalent = (==)
+
 data SimplyTypedErr c v t =
       STNotKnownErr (NotKnownErr c v t)
     | STSimpleTypeErr (SimpleTypeErr t)

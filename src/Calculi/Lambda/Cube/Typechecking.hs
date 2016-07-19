@@ -14,13 +14,14 @@ module Calculi.Lambda.Cube.Typechecking (
     , runTypecheck
     , expression
     , environment
+    , (<><>)
     -- ** ErrorContext
     , ErrorContext(..)
     , ErrorContext'
     , throwErrorContext
     , throwErrorContexts
     , errorOfContext
-    , addExprToStacks
+    , appendExprToEContexts
     -- ** Simply-typed lambda calculus
     , SimpleTypingContext(..)
     , NotKnownErr(..)
@@ -33,6 +34,7 @@ import           Calculi.Lambda.Cube.SimpleType
 import           Data.Bifunctor
 import           Control.Monad.State
 import           Control.Monad.Except
+import           Data.Semigroup
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.List.NonEmpty  as NE
@@ -64,16 +66,34 @@ type ErrorContext' c v t err = ErrorContext (TypingContext c v t) (LambdaTerm c 
 instance Functor (ErrorContext env expr) where
     fmap f = errorOfContext %~ f
 
-throwErrorContext exprStack err = get >>= (\env' -> throwError [ErrorContext exprStack env' err])
-
-throwErrorContexts exprsAndErrs =
-    get >>= (\env' -> throwError (uncurry (flip ErrorContext env') <$> exprsAndErrs))
+{-|
+    Throw an error in an 'ErrorContext'.
+-}
+throwErrorContext exprStack err = throwErrorContexts [(exprStack, err)]
 
 {-|
-    If there have been any errors, add the given expression to the top of the
-
+    Throw a list of errors in `ErrorContext`'s.
 -}
-addExprToStacks expr = flip catchError (throwError . fmap (expression %~ (expr :)))
+throwErrorContexts exprsAndErrs = do
+    -- Get the current environment at the time of the errors.
+    env <- get
+    -- For every error, create an ErrorContext with the environment 'env' and the given error
+    -- error and expression stack.
+    throwError ((\(exprStack, err) -> ErrorContext exprStack env err) <$> exprsAndErrs)
+
+{-|
+    If there have been any errors, add the given expression to the head of
+    all the error contexts' expression stacks.
+-}
+appendExprToEContexts expr = flip catchError (throwError . fmap (expression %~ (expr :)))
+
+{-|
+    A validation semigroup on Eithers, combining Left values when two appear.
+-}
+(<><>) :: (Semigroup s1, Semigroup s2) => Either s1 s2 -> Either s1 s2 -> Either s1 s2
+(<><>) = curry $ \case
+    (Left a, Left b) -> Left (a <> b)
+    (a, b)           -> (<>) <$> a <*> b
 
 {-|
     Name-related errors, for when there's a variable, type or constant
@@ -85,6 +105,7 @@ data NotKnownErr c v t =
     | UnknownVariable v
     -- ^ A variable appears that is not in scope
     | UnknownConstant c
+    -- ^ A constant appears that is not in scope
     deriving (Eq, Ord, Show)
 
 data SimpleTypeErr t =
