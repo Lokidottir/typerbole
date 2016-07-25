@@ -1,6 +1,6 @@
 module Calculi.Lambda.Cube.TH (
-      sfo
-    , sf
+     -- sfo
+      sf
     , stlc
 ) where
 
@@ -18,7 +18,7 @@ import Control.Monad
 -- | Lambda Cube parsec type.
 type LCParsec = Parsec String
 -- | SystemFOmega with mono and poly types represented as strings.
-type StringSFO = SFO.SystemFOmega String String (Maybe (STLC.SimplyTyped String))
+-- type StringSFO = SFO.SystemFOmega String String (Maybe (STLC.SimplyTyped String))
 -- | SystemF with mono and poly types represented as strings.
 type StringSF = SF.SystemF String String
 -- | SimplyTyped with mono types represented as strings.
@@ -101,7 +101,7 @@ exprsequence subexpr = label "expression sequence" $ do
     -- if after the initial sequence it turned out this was the first
     -- argument to a function expression, then we apply it as the first argument.
     return (maybe expr (expr /->) funApply)
-
+{-
 sfoexpr :: LCParsec StringSFO
 sfoexpr = label "System-Fω expression" $
            quant sfoexpr
@@ -109,7 +109,7 @@ sfoexpr = label "System-Fω expression" $
                                     poly <$> variable
                                 <|> mono <$> constant
                                 <|> paren sfoexpr)
-
+-}
 sfexpr :: LCParsec StringSF
 sfexpr = label "System-F expression" $
           quant sfexpr
@@ -120,7 +120,7 @@ sfexpr = label "System-F expression" $
 stlcexpr :: LCParsec StringSTLC
 stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|> paren stlcexpr)
 
-
+{-
 {-|
     A QuasiQuoter for SystemFOmega, allowing arbitrary type application
 
@@ -128,7 +128,7 @@ stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|>
 -}
 sfo :: TH.QuasiQuoter
 sfo = mkqq "sfo" sfoexpr
-
+-}
 {-|
     A QuasiQuoter for SystemF, allowing quantification and poly types (lower case).
 
