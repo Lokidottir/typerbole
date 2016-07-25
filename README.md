@@ -2,27 +2,29 @@
 
 A library classifying typesystems with typeclasses.
 
-## The Library
+## Parameterized Typesystems
 
-### Lambda Calculus
+Like how datatypes such as `List a` (`[a]`), `Set a`, `Tree a` etc. in haskell have a parameter for a contained type, this library is based on the idea that a datatype that represents expressions can have a parameter for a typesystem.
 
-This library uses a minimal lambda calculus representation as an AST to manipulate and typecheck expressions:
+### The Lambda Calculus
+
+As an example, we can put together a datatype that represents the syntax for the Lambda Calculus:
 
 ```haskell
 data LambdaTerm c v t =
-      Variable v
-    | Constant c
-    | Apply (LambdaTerm c v t) (LambdaTerm c v t)
-    | Lambda (v, t) (LambdaTerm c v t)
+      Variable v -- a variable bound by a lambda abstraction
+    | Constant c -- a constant defined outside of the term
+    | Apply (LambdaTerm c v t) (LambdaTerm c v t) -- an application of one term to another
+    | Lambda (v, t) (LambdaTerm c v t) -- A lambda abstraction
 ```
 
-An important part of this datatype is the parameter `t`, which represents the type system used. With this being a parameterized part of the AST, we can slot in any typesystem we choose!
+This datatype has 3 parameters. The first two parameters represent constants and variables respectively, what's important is the final parameter `t` which is the parameter for the typesystem being used.
 
 ### The Lambda Cube
 
-The lambda cube describes the properties of a number of typesystems, an overview can be found [here](./lambdacube-overview.md).
+The lambda cube describes the properties of a number of typesystems, an overview can be found [**here**](./lambdacube-overview.md). It is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
 
-The lambda cube is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
+![](./diagrams/typeclass-hierarchy.svg)
 
 ***
 
@@ -31,7 +33,7 @@ The lambda cube is the basis for the library's classification of typesystems, a 
 - [x] Simply-typed lambda calculus
 - [x] Polymorphic lambda calculus
 - [x] Higher-order lambda calculus
-- [ ] Dependently-typed lambda calculus
+- [x] Dependently-typed lambda calculus (dubiously, not got a implemented typesystem to back it up)
 
 ### TODOs
 
@@ -40,7 +42,6 @@ The lambda cube is the basis for the library's classification of typesystems, a 
 - [ ] Design a typeclass for typesystems with constraints (`Num a => ...`, `a ~ T` etc).
 - [ ] Provide a default way of evaluating lambda expressions.
 - [ ] Make the quasiquoters use the lambda cube typeclasses instead of specific typesystem implementations.
-- [ ] Have a typeclass for evaluatable calculi (Kappa calculus and the like). This may be unnecessary abstraction.
 - [ ] Subhask-style automated test writing.
 - [ ] More formally represent typing rules instead of just implementing typesystems ad-hoc and hoping they are at least equivalent (Would require a significant amount of refectoring, if it gets to a point where the library becomes less accessable then stick with the ad-hoc approach).
 - [ ] Explore homotopy type theory

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="43cm" height="16cm" viewBox="79 159 843 313" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g>
+    <rect style="fill: #ffffff" x="320" y="160" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="320" y="160" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="400" y="183.9">
+      <tspan x="400" y="183.9">SimpleType</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="120" y="260" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="120" y="260" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="200" y="283.9">
+      <tspan x="200" y="283.9">Polymorphic</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="320" y="260" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="320" y="260" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="400" y="283.9">
+      <tspan x="400" y="283.9">HigherOrder</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="520" y="260" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="520" y="260" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="600" y="283.9">
+      <tspan x="600" y="283.9">Dependent</tspan>
+    </text>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" d="M 360 200 C 360,240 200,220 200,249"/>
+    <polygon style="fill: #000000" points="195,249 200,259 205,249 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="195,249 200,259 205,249 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="400" y1="200" x2="400" y2="249"/>
+    <polygon style="fill: #000000" points="395,249 400,259 405,249 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="395,249 400,259 405,249 "/>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" d="M 440 200 C 440,240 600,220 600,249"/>
+    <polygon style="fill: #000000" points="595,249 600,259 605,249 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="595,249 600,259 605,249 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="480" y1="180" x2="589" y2="179.092"/>
+    <polygon style="fill: #000000" points="589.042,184.091 599,179.008 588.959,174.092 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="589.042,184.091 599,179.008 588.959,174.092 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="160" y1="300" x2="160" y2="349"/>
+    <polygon style="fill: #000000" points="155,349 160,359 165,349 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="155,349 160,359 165,349 "/>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" d="M 200 300 C 200,360 280,300 280,409"/>
+    <polygon style="fill: #000000" points="275,409 280,419 285,409 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="275,409 280,419 285,409 "/>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" d="M 360 300 C 360,340 320,340 320,409"/>
+    <polygon style="fill: #000000" points="315,409 320,419 325,409 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="315,409 320,419 325,409 "/>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" d="M 240 300 C 240,360 420,300 420,349"/>
+    <polygon style="fill: #000000" points="415,349 420,359 425,349 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="415,349 420,359 425,349 "/>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" d="M 440 300 C 440,340 460,320 460,349"/>
+    <polygon style="fill: #000000" points="455,349 460,359 465,349 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="455,349 460,359 465,349 "/>
+  </g>
+  <g>
+    <path style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" d="M 600 300 C 600,360 500,300 500,349"/>
+    <polygon style="fill: #000000" points="495,349 500,359 505,349 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="495,349 500,359 505,349 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="740" y="320" width="180" height="38"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="740" y="320" width="180" height="38"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="830" y="342.9">
+      <tspan x="830" y="342.9">typerbole typeclass</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="830" y1="358" x2="830" y2="388.02"/>
+    <polygon style="fill: #000000" points="825,388.02 830,398.02 835,388.02 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="825,388.02 830,398.02 835,388.02 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="220" y="420" width="160" height="38"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x="220" y="420" width="160" height="38"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="300" y="442.9">
+      <tspan x="300" y="442.9">SystemFOmega</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="80" y="360" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x="80" y="360" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="160" y="383.9">
+      <tspan x="160" y="383.9">SystemF</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="380" y="360" width="160" height="38"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x="380" y="360" width="160" height="38"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="460" y="382.9">
+      <tspan x="460" y="382.9">CalcOfConstructions</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="740" y="400" width="180" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x="740" y="400" width="180" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="830" y="430.9">
+      <tspan x="830" y="430.9">instance of that</tspan>
+      <tspan x="830" y="446.9">typeclass</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="600" y="160" width="160" height="38"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x="600" y="160" width="160" height="38"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="680" y="182.9">
+      <tspan x="680" y="182.9">SimplyTyped</tspan>
+    </text>
+  </g>
+</svg>

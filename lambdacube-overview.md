@@ -19,7 +19,7 @@ thisFunctionTakesAFunction f = f 20
 
 On it's own, the simply-typed lambda calculus is alright for simple programs. Additionally, if a way to do recursion isn't provided in languages using the STLC then it's proven that program will terminate (strong normalisation).
 
-It's the simplest typesystem in the cube though, there's a limit to what it can express. The other axis of the lambda cube aim to make more programs able to be written in a typesafe way, using this typesystem as a base.
+It's the simplest typesystem in the cube though, there's a low limit to what it can express. Each axis of the lambda cube extends the kind of programs that can be written in a typesafe way. 
 
 ## Polymorphism
 
@@ -84,12 +84,14 @@ setOfInt = fromList [1,2,3,4,5]
 
 ## Dependent types
 
-Dependent types lets us have values as types. This can seem confusing, but when using typerbole you can
+Dependent types lets us have values in types at compile time. This can seem confusing, but when using typerbole you are manipulating type expressions as values, this just gives this ability to a programming language targeting a dependent lambda calculus by letting the programmer embed lambda terms (in this library, this means being able to convert a `LambdaTerm` value to a type) at the type level.
+
+<!-- Example wanted -->
 
 ***
 ##### Footnotes
 
-[1] In typerbole's source code type constants are called mono types because of the lambda calculus implementation uses the names `Var[iable]` (and `Constant`, or at least it's intended to be used in future).
+[1] In typerbole's source code type constants are called mono types because of the lambda calculus implementation uses the names `Variable` and `Constant`.
 
 [2] In typerbole's source type variables are reffered to as poly types, see [1]
 
