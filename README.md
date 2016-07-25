@@ -24,7 +24,7 @@ This datatype has 3 parameters. The first two parameters represent constants and
 
 The lambda cube describes the properties of a number of typesystems, an overview can be found [**here**](./lambdacube-overview.md). It is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
 
-![](./diagrams/typeclass-hierarchy.svg)
+![](./diagrams/typeclass-hierarchy.png)
 
 ***
 
