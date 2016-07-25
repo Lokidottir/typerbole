@@ -12,9 +12,9 @@ module Calculi.Lambda.Cube.Polymorphic (
     , (\-/)
     , generalise
     , generalise'
-    , typeVariables
-    , boundTypeVariables
-    , typeConstants
+    , polytypesOf
+    , boundPolytypesOf
+    , monotypesOf
     , isPolyType
     -- ** Typechecking context
     , SubsContext(..)
@@ -35,7 +35,7 @@ import           Control.Lens as Lens hiding ((&))
 -}
 data SubsContext t p = SubsContext {
       _subsMade :: Map.Map p t
-    -- ^ The substitutions made so far, where the key is the type variable
+    -- ^ The substitutions made so far, where the key is the poly type
     -- that is substituted and the value is what is substituting it.
     , _tape :: [p]
     -- ^ An infinite list of polytypes not present in the who typing context.
@@ -137,40 +137,17 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
 
         ===Behaviour
 
-        * Quantifying a type variable that appears in a type expression.
+        * Quantifying a poly type that appears in a type expression.
 
             >>> quantify a (a → X)
             (∀ a. a → X)
 
-        * Quantifying a type variable that doesn't appear in a type expression
+        * Quantifying a poly type that doesn't appear in a type expression
 
             >>> quantify a (b → X)
             (∀ a. b → X)
     -}
     quantify :: PolyType t -> t -> t
-
-    {-|
-        Split a quantification into it's variable being quantified and
-        the expression targeted by the quantification. A safe inverse of `quantify`.
-
-        ===Behaviour
-
-        * Unquantifying a type expression that quantifies a single poly type.
-
-            >>> unquantify (∀ a. a → b)
-            Just (a, a → b)
-
-        * Unquantifying a type expression that quantifies multiple poly types
-
-            >>> unquantify (∀ a b. a b)
-            Just (a, ∀ b. a b)
-
-        * Unquantifying a type expression that quantifies none of it's poly types.
-
-            >>> unquantify (A b)
-            Nothing
-    -}
-    unquantify :: t -> Maybe (PolyType t, t)
 
     {-|
         Polymorphic constructor synonym, as many implementations will have a constructor along
@@ -179,27 +156,50 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     poly :: PolyType t -> t
 
     {-|
-        Function retrives all the free type variables in a type.
-        If the type is itself an unbound poly type, then that is returned.
+        Function that retrives all the poly types in a type, quantified
+        or not.
 
         ===Behaviour
 
         * Type expression with some of it's poly types quantified.
 
-            >>> freeTypeVariables (∀ a b. a → b → c d))
-            Set.fromList [c, d]
+            >>> polytypesOf (∀ a b. a → b → c d))
+            Set.fromList [a, b, c, d]
 
         * Type expression with no quantified poly types.
 
-            >>> freeTypeVariables (a → b → c)
+            >>> polytypesOf (a → b → c)
             Set.fromList [a, b, c]
 
         * Type expression with no unquantified poly types.
 
-            >>> freeTypeVariables (∀ c. X → c)
-            Set.empty
+            >>> polytypesOf (∀ c. X → c)
+            Set.singleton (c)
     -}
-    freeTypeVariables :: t -> Set.Set t
+    polytypesOf :: t -> Set.Set t
+
+    {-|
+        Function that retrives all the quantified poly types in
+        a type expression.
+
+        ===Behaviour
+
+        * Type expression with some of it's poly types quantified.
+
+            >>> quantifiedOf (∀ a b. a → b → c d))
+            Set.fromList [a, b]
+
+        * Type expression with no quantified poly types.
+
+            >>> quantifiedOf (a → b → c)
+            Set.empty
+
+        * Type expression with no unquantified poly types.
+
+            >>> quantifiedOf (∀ c. X → c)
+            Set.singleton (c)
+    -}
+    quantifiedOf :: t -> Set.Set t
 
 {-|
     Infix `areAlphaEquivalent`
@@ -218,26 +218,26 @@ infix 4 ≣
 infixr 6 \-/
 
 {-|
-    All the type variables in a type expression, bound or unbound.
+    All the unbound polytypes in a type expression.
 -}
-typeVariables :: Polymorphic t => t -> Set.Set t
-typeVariables t = Set.fromList . concatMap (\(Mutual a b) -> poly <$> [a, b]) $ fromRight [] (substitutions t t)
+freePolytypesOf :: Polymorphic t => t -> Set.Set t
+freePolytypesOf t = polytypesOf t `Set.difference` quantifiedOf t
 
 {-|
-    Bound type variables of an expression.
+    Bound polytypes of an expression.
 -}
-boundTypeVariables :: Polymorphic t => t -> Set.Set t
-boundTypeVariables t = Set.difference (typeVariables t) (freeTypeVariables t)
+boundPolytypesOf :: Polymorphic t => t -> Set.Set t
+boundPolytypesOf = quantifiedOf
 
 {-|
-    Type constants/Mono types of a type expression.
+    Monotypes of a type expression.
 -}
-typeConstants :: Polymorphic t => t -> Set.Set t
-typeConstants t = Set.difference (bases t) (typeVariables t)
+monotypesOf :: Polymorphic t => t -> Set.Set t
+monotypesOf t = Set.difference (bases t) (polytypesOf t)
 
 {-|
-    Quantify every free type variable in a type expression, excluding a
-    set of free type variables to not quantify.
+    Quantify every free polytype in a type expression, excluding a
+    set of polytypes to not quantify.
 
     >>> generalise Set.empty (x → y)
     (∀ x y. x → y)
@@ -249,7 +249,7 @@ generalise :: forall t. Polymorphic t => Set.Set t -> t -> t
 generalise exclude t = foldr quantify t ftvsBare where
     ftvsBare :: Set.Set (PolyType t)
     ftvsBare = Set.fromList $ snd <$> filter (flip Set.member ftvs . fst) polyTypes where
-        ftvs = Set.difference (freeTypeVariables t) exclude
+        ftvs = Set.difference (freePolytypesOf t) exclude
         polyTypes :: [(t, PolyType t)]
         polyTypes = fmap (\(Mutual a b) -> (poly a, b)) . fromRight [] $ substitutions t t
 
@@ -261,7 +261,7 @@ generalise' = generalise Set.empty
 
 {-|
     Check if two types are equivalent, where equivalence is defined as the substitutions
-    being made being symbolically identical, where binds and type variables appear in
+    being made being symbolically identical, where binds and poly types appear in
     the same place but may have different names (this is Alpha Equivalence).
 
     >>> areAlphaEquivalent (∀ a. X → a) (∀ z. X → z)

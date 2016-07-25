@@ -18,7 +18,7 @@ import Control.Monad
 -- | Lambda Cube parsec type.
 type LCParsec = Parsec String
 -- | SystemFOmega with mono and poly types represented as strings.
-type StringSFO = SFO.SystemFOmega String String
+type StringSFO = SFO.SystemFOmega String String (Maybe (STLC.SimplyTyped String))
 -- | SystemF with mono and poly types represented as strings.
 type StringSF = SF.SystemF String String
 -- | SimplyTyped with mono types represented as strings.
@@ -130,7 +130,7 @@ sfo :: TH.QuasiQuoter
 sfo = mkqq "sfo" sfoexpr
 
 {-|
-    A QuasiQuoter for SystemF, allowing quantification and type variables (lower case).
+    A QuasiQuoter for SystemF, allowing quantification and poly types (lower case).
 
     @[sf| forall a b. a -> b |] == quantify \"a\" (quantify \"b\" (poly \"a\" \/-> poly \"b\"))@
 

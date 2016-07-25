@@ -6,35 +6,32 @@ import           Calculi.Lambda.Cube.SimpleType
 import           Calculi.Lambda.Cube.Typechecking
 import qualified Data.Map                                as Map
 
-type KindEnvironment t = Map.Map t (Kindedness t)
-
 {-|
-    The type constants for higher-order typed lambda calculus.
+    Typeclass for higher-order types. Classically this would just be checking the
+    <https://en.wikipedia.org/wiki/Arity arity> of type constructors but there are
+    more complex typesystems that exist that could benefit from allowing an arbitrary
+    typechecking ability for a higher-order typesystem.
 -}
-data Star =
-      Star
-    -- ^ The kind constant "@*@".
-    deriving (Eq, Ord, Show, Read)
-
-{-|
-    The representation to be typechecked at the kind level.
--}
-type Kindedness t = LambdaTerm t () (Kindsystem t)
-
-{-|
-    Typeclass for higher-order types.
--}
-class (Typecheckable t () (Kindsystem t), SimpleType t) => HigherOrder t where
+class (SimpleType t) => HigherOrder t where
     {-|
-        The typesystem of the typesystem.
+        The typesystem for the kindedness of type expressions.
     -}
     type Kindsystem t :: *
 
     {-|
-        Turn a type expression into a lambda expression describing how the types
-        are applied to eachother.
+        A typing context for the kindedness of type expressions. Analogue to `TypingContext`.
     -}
-    kind :: t -> Kindedness t
+    type KindContext t :: *
+
+    {-|
+        Type errors for the kindedness of type expressions. Analogue to `TypeError`.
+    -}
+    type KindError t :: *
+
+    {-|
+        Typecheck a type expression.
+    -}
+    kindcheck :: KindContext t -> t -> Either [KindError t] (KindContext t, Kindsystem t)
 
     {-|
         More generalised form of `abstract` to work on all type operators, not
@@ -60,24 +57,8 @@ class (Typecheckable t () (Kindsystem t), SimpleType t) => HigherOrder t where
     untypeap :: t -> Maybe (t, t)
 
 {-|
-    Typecheck a type expression's kindedness.
--}
-kindcheck :: forall t ksys. (Kindsystem t ~ ksys, HigherOrder t)
-          => TypingContext t () ksys                -- ^ A typing context for typechecking
-          -> t                                      -- ^ A type expression to kindcheck
-          -> Either [TypeError t () ksys]
-                    (TypingContext t () ksys, ksys) -- ^ The result.
-kindcheck ctx texpr = typecheck ctx (kind texpr)
-
-{-|
     Infix `typeap`.
 -}
 (/$) :: (HigherOrder t) => t -> t -> t
 (/$) = typeap
 infixl 8 /$
-
-{-|
-    Shorthand for the constant `Star` in typesystems.
--}
-star :: (SimpleType t, MonoType t ~ Star) => t
-star = mono Star

@@ -169,7 +169,7 @@ hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Either [SubsErr Gr t p] [(t, p)
     return a list of substitutions in the form @(t, p)@.
 -}
 resolveMutuals :: forall t p. (Polymorphic t, p ~ PolyType t)
-               => [Substitution t p] -- ^ The list of substitutions
+               => [Substitution t p] -- ^ The list of mixed (see `Substitution`) substitutions.
                -> [(t, p)] -- ^ The resulting list of substitutions
 resolveMutuals subs =
     let (mutuals, subs') = partitionSubstitutions subs
@@ -333,8 +333,8 @@ substitutionGraphGr = substitutionGraph
 substitutionGraphM
     :: forall t p gr. -- No haddock documentation for constraints, but putting this here anyway
     ( Polymorphic t   -- The typesystem @t@ is a an instance of Polymorphic
-    , p ~ PolyType t  -- @p@ is @t@'s representation of type variables
-    , Ord p           -- t's representation of type variables is ordered
+    , p ~ PolyType t  -- @p@ is @t@'s representation of poly types
+    , Ord p           -- t's representation of poly types is ordered
     , DynGraph gr     -- the graph representation is an instance of DynGraph
     )
     => [(t, p)]       -- ^ A list of substitutions
@@ -350,8 +350,8 @@ substitutionGraphM subs = do
        type expressions using the polymorphic constructor, allowing all substitutions to
        have at least one edge from the substitutions to the targets. -}
     let typeExprs = nubSort $ subs >>= (\(t, p) -> [t, poly p])
-    -- Build a list of type expressions and their bases.
-    let basesList = (\t -> (t, typeVariables t)) <$> typeExprs
+    -- Build a list of type expressions and their poly types.
+    let basesList = (\t -> (t, polytypesOf t)) <$> typeExprs
                                 -- Why not freeTypeVariables?
                                 -- Because during random tests the case where a variable was
                                 -- quantified in different areas happened a bunch.

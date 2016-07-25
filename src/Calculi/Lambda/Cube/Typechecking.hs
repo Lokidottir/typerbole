@@ -61,7 +61,7 @@ makeLenses ''ErrorContext
 {-|
     ErrorContext but the environment is assumed to be the TypingContext of @t@.
 -}
-type ErrorContext' c v t err = ErrorContext (TypingContext c v t) (LambdaTerm c v t) err
+type ErrorContext' term t err = ErrorContext (TypingContext term t) (term t) err
 
 instance Functor (ErrorContext env expr) where
     fmap f = errorOfContext %~ f
@@ -119,13 +119,16 @@ data SimpleTypeErr t =
 {-|
     Typechecking type, uses the TypingContext as state and TypeError as an exception type.
 -}
-type Typecheck c v t = ExceptT [TypeError c v t] (State (TypingContext c v t))
+type Typecheck term t = ExceptT [TypeError term t] (State (TypingContext term t))
 
 -- | runs a `Typecheck` action
 runTypecheck :: st -> ExceptT e (State st) t -> Either e (st, t)
 runTypecheck env = (\(e, st) -> (,) st <$> e ) . flip runState env . runExceptT
 
-class SimpleType t => Typecheckable c v t where
+{-|
+    A typeclass for typechecking terms (@term@) with a typesystem (@t@).
+-}
+class Typecheckable (term :: * -> *) t where
     {-|
         The typing context, in type theory this is usually shown as 𝚪.
 
@@ -134,35 +137,35 @@ class SimpleType t => Typecheckable c v t where
         for the implementer though as other typesystems might need extra information
         in their contexts.
     -}
-    type TypingContext c v t :: *
+    type TypingContext term t :: *
 
     {-|
         The type error representation.
     -}
-    type TypeError c v t :: *
+    type TypeError term t :: *
 
     {-|
         Given a typing context, typecheck an expression and either return a typeerror or the
         type of the expression that was passed.
     -}
-    typecheck :: TypingContext c v t           -- ^ The given context
-              -> LambdaTerm c v t              -- ^ The expression to typecheck
-              -> Either [TypeError c v t]
-                        (TypingContext c v t, t) -- ^ The result
+    typecheck :: TypingContext term t            -- ^ The given context
+              -> term t                          -- ^ The expression to typecheck
+              -> Either [TypeError term t]
+                        (TypingContext term t, t) -- ^ The result
 
-class (Typecheckable c v t) => Inferable c v t where
+class (Typecheckable term t) => Inferable term t where
 
     {-|
         The inference context, has a similar function to `TypingContext`
     -}
-    type InferenceContext c v t :: *
+    type InferenceContext term t :: *
 
     {-|
         The inference error representation.
     -}
-    type InferError c v t :: *
+    type InferError term t :: *
 
-    infer :: InferenceContext c v t                          -- ^ The given context
-          -> LambdaTerm c v (Maybe t)                        -- ^ The expression to infer from
-          -> Either (InferError c v t)
-                    (InferenceContext c v t, LambdaTerm c v t) -- ^ The result
+    infer :: InferenceContext term t                  -- ^ The given context
+          -> term (Maybe t)                           -- ^ The expression to infer from
+          -> Either [InferError term t]
+                    (TypingContext term t, term t) -- ^ The result

@@ -113,7 +113,7 @@ class (Ord t) => SimpleType t where
     {-|
         Type equivalence, for simple typesystems this might be `(==)` but for polymorphic or
         dependent typesystems this might also include alpha equivalence or reducing the
-        type expressions to normal form before performing another.
+        type expressions to normal form before performing another equivalence check.
     -}
     equivalent :: t -> t -> Bool
 
@@ -122,6 +122,8 @@ class (Ord t) => SimpleType t where
 -}
 (====) :: SimpleType t => t -> t -> Bool
 (====) = equivalent
+
+infix 4 ====
 
 {-|
     Infix `abstract` with the appearence of @↦@, which is used to denote function
