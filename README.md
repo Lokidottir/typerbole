@@ -20,7 +20,7 @@ data LambdaTerm c v t =
 
 This datatype has 3 parameters. The first two parameters represent constants and variables respectively, what's important is the final parameter `t` which is the parameter for the typesystem being used.
 
-### The Lambda Cube
+## The Lambda Cube
 
 The lambda cube describes the properties of a number of typesystems, an overview can be found [**here**](./lambdacube-overview.md). It is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
 

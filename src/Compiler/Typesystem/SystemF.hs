@@ -42,15 +42,17 @@ instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
     show (Mono m) = show m
     show (Poly p) =  show p
     show (Function a b) =
-        let astr = if isFunction a || isJust (unquantify a) then "(" ++ show a ++ ")" else show a
+        let isForall (Forall _ _) = True
+            isForall _ = False
+            astr = if isFunction a || isForall a then "(" ++ show a ++ ")" else show a
         in  astr ++ " -> " ++ show b
     show (Forall p expr) =
         let getQuant :: SystemF m p -> ([p], SystemF m p)
             getQuant (Forall _p _expr) = getQuant _expr & _1 %~ (_p :)
             getQuant _expr             = ([], _expr)
-
             (ps, _expr) = getQuant expr
         in "forall " ++ unwords (show <$> (p:ps)) ++ ". " ++ show _expr
+
 
 deriveBifunctor ''SystemF
 deriveBifoldable ''SystemF
@@ -97,26 +99,29 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 
     applySubstitution sub target = applySubstitution' where
         applySubstitution' = \case
-            m@Mono{}                     -> m
+            m@Mono{}           -> m
             p'@(Poly p)
                 | p == target  -> sub
-                | otherwise              -> p'
+                | otherwise    -> p'
             Forall p expr
-                | p == target -> applySubstitution' expr
-                | otherwise              -> Forall p (applySubstitution' expr)
-            Function fune arge           -> Function (applySubstitution' fune) (applySubstitution' arge)
+                | p == target  -> applySubstitution' expr
+                | otherwise    -> Forall p (applySubstitution' expr)
+            Function from to -> Function (applySubstitution' from) (applySubstitution' to)
 
     quantify = Forall
-    unquantify (Forall a b) = Just (a, b)
-    unquantify _ = Nothing
 
     poly = Poly
 
-    freeTypeVariables = \case
+    quantifiedOf = \case
+        Mono _ -> Set.empty
+        Poly _ -> Set.empty
+        Function from to -> quantifiedOf from <> quantifiedOf to
+        Forall p texpr -> Set.insert (poly p) (quantifiedOf texpr)
+
+    polytypesOf = \case
         Mono _ -> Set.empty
         p@Poly{} -> Set.singleton p
-        Forall p expr -> Set.delete (Poly p) (freeTypeVariables expr)
-        Function l r -> freeTypeVariables l <> freeTypeVariables r
+
 
 {-|
     Error sum not within Eithers because those (GHC) type errors are messy.
@@ -138,14 +143,13 @@ data SystemFContext c v t p = SystemFContext {
 
 makeLenses ''SystemFContext
 
-instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable c v (SystemF m p) where
+instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF m p) where
 
-    type TypingContext c v (SystemF m p) = (SystemFContext c v (SystemF m p) p)
+    type TypingContext (LambdaTerm c v) (SystemF m p) = (SystemFContext c v (SystemF m p) p)
 
-    type TypeError c v (SystemF m p) =
+    type TypeError (LambdaTerm c v) (SystemF m p) =
         ErrorContext'
-            c
-            v
+            (LambdaTerm c v)
             (SystemF m p)
             (SystemFErr c v (SystemF m p))
 
@@ -153,7 +157,7 @@ instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable c v (SystemF m p) where
         {-
             Using thhe
         -}
-        typecheck' :: LambdaTerm c v (SystemF m p) -> Typecheck c v (SystemF m p) (SystemF m p)
+        typecheck' :: LambdaTerm c v (SystemF m p) -> Typecheck (LambdaTerm c v) (SystemF m p) (SystemF m p)
         typecheck' __expr =
             -- Append the current expression to any ErrorContexts
             flip catchError (throwError . fmap (expression %~ (__expr :)))
@@ -228,7 +232,7 @@ instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (
                   ]
 
         {-
-            Remove all generated quantifications and then generalise the expression's type variables.
+            Remove all generated quantifications and then generalise the expression's poly types.
         -}
         process = generalise' . massUnquantify where
             {-

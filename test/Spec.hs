@@ -41,7 +41,8 @@ type SystemFOmega' = SystemFOmega AlphabetUpper AlphabetLow
 type SystemF' = SF.SystemF AlphabetUpper AlphabetLow
 
 followsSimpleType :: forall t. (SimpleType t, Show t, Arbitrary t) => Gen t -> Spec
-followsSimpleType gen = describe "SimpleType laws and properties" $
+followsSimpleType gen = describe "SimpleType laws and properties" $ do
+    prop "equivalence is reflexive" $ ((\ !ty -> ty ==== ty) :: t -> Bool)
     prop "follows abstract-reify inverse law" $ (abstractInverse :: t -> t -> Bool)
 
 followsPolymorphic :: forall t.
@@ -55,12 +56,12 @@ followsPolymorphic :: forall t.
                       )
                    => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
-    prop "equivalence is reflexive"
-        ((\ !ty -> ty ≣ ty) :: t -> Bool)
     prop "follows quantify-unquantify inverse law"
-        (quantifyInverse :: (PolyType t) -> t -> Bool)
-    prop "follows type-ordering rule 1"
+        (quantifyInverse :: PolyType t -> t -> Bool)
+    prop "follows type-ordering rule ((forall a. a) ⊑ _ = True)"
         (typeOrderingRule :: t -> Bool)
+    prop "lifts up quantification during abstraction"
+        (liftQuantifiersRule :: t -> PolyType t -> Bool)
 
 unificationRules :: forall t.
                     (
@@ -119,7 +120,7 @@ typeOrderingRule !t = poly (toEnum 9999) ⊑ t
     Assert that `abstract` lifts all of the quantifiers to the result.
 -}
 liftQuantifiersRule :: (Polymorphic t, PolyType t ~ p) => t -> p -> Bool
-liftQuantifiersRule t p = t /-> quantify p (poly p) == quantify p (t /-> poly p)   
+liftQuantifiersRule t p = t /-> quantify p (poly p) == quantify p (t /-> poly p)
 
 unifyR1 :: forall t e. (Enum e, Polymorphic t, Show t, PolyType t ~ e) => t -> t -> Bool
 unifyR1 !t1 !t2 =
@@ -128,7 +129,7 @@ unifyR1 !t1 !t2 =
     fromRight True $ do
         subs <- unify t1 t2
         u <- applyAllSubsGr subs
-        return (u t1 ≣ u t2)
+        return (u t1 ==== u t2)
 
 unifyR2 !t1 !t2 =
     fromRight True $ do
@@ -139,13 +140,11 @@ unifyR2 !t1 !t2 =
 
 {-
     The input predicate for unifyR1; the type variables in each expression
-    must be disjoint and there must be valid substitutions between the two expressions.
+    must be disjoint, there must be valid substitutions between the two expressions,
+    and the expressions must not be equivalent to eachother.
 -}
 unifyR1Predicate (t1, t2) =
-    t1'tvs `disjoint` t2'tvs && hasSubstitutions t1 t2 where
-
-        alltvs = t1'tvs <> t2'tvs
-
+    t1'tvs `disjoint` t2'tvs && hasSubstitutions t1 t2 && not (t1 ==== t2) where
         t1'tvs = typeVariables t1
         t2'tvs = typeVariables t2
 

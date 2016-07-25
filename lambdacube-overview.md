@@ -2,7 +2,7 @@
 
 ## Simply-typed lambda calculus
 
-The simply-typed lambda calculus is, well, *the most simple typesystem* in the lambda cube. It lets you have type constants[1] (`Int`, `Bool`, `String` etc.) and the function arrow `->` to make functions from one type to another.
+The simply-typed lambda calculus is *the most simple typesystem* in the lambda cube. It lets you have type constants[1] (`Int`, `Bool`, `String` etc.) and the function arrow `->` to make functions from one type to another.
 
 ```haskell
 -- Functions and values in the simply-typed lambda calculus.
@@ -17,9 +17,9 @@ thisFunctionTakesAFunction : (Int -> String) -> String
 thisFunctionTakesAFunction f = f 20
 ```
 
-On it's own, the simply-typed lambda calculus is alright for simple programs. Additionally, if a way to do recursion isn't provided in languages using the STLC then it's proven that program will terminate (strong normalisation).
+On it's own, the simply-typed lambda calculus is okay for simple programs. Additionally, if a way to do recursion isn't provided in languages using the STLC then the programs are strongly normalising (they will always terminate).
 
-It's the simplest typesystem in the cube though, there's a low limit to what it can express. Each axis of the lambda cube extends the kind of programs that can be written in a typesafe way. 
+It's the simplest typesystem in the cube though, there's a low limit to what it can express. Each axis of the lambda cube extends the kind of programs that can be written in a typesafe way.
 
 ## Polymorphism
 

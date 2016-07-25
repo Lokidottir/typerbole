@@ -1,4 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-|
     <https://en.wikipedia.org/wiki/System_F#System_F.CF.89 System Fω> is a System F that allows
     type operators (@Set Int@, @List Int@, @Either Int Bool@ etc.)
@@ -23,18 +26,19 @@ import qualified Data.Set                        as Set
 import           Test.QuickCheck
 
 {-|
-    A data type representing the components of System-Fω.
+    A data type representing the components of System-Fω, with a parameterized
+    higher-order typesystem @k@.
 -}
-data SystemFOmega m p =
+data SystemFOmega m p k =
       Mono m
       -- ^ A mono type
     | FunctionArrow
       -- ^ Explicitly stated mono type of kind @(* → * → *)@ for type application reasons
     | Poly p
       -- ^ A poly type, i.e. the "@a@" in "@∀ a. a → a@"
-    | Forall p (SystemFOmega m p)
-      -- ^ A binding of a poly type variable in a type expression, i.e. the "@∀ a.@" in "@∀ a. a@"
-    | TypeAp (SystemFOmega m p) (SystemFOmega m p)
+    | Forall (p, k) (SystemFOmega m p k)
+      -- ^ A binding of a poly type in a type expression, i.e. the "@∀ a.@" in "@∀ a. a@"
+    | TypeAp (SystemFOmega m p k) (SystemFOmega m p k)
       -- ^ Type application.
     deriving (Eq, Ord, Show, Read, Data)
 
@@ -45,28 +49,29 @@ deriveBifoldable ''SystemFOmega
 deriveBitraversable ''SystemFOmega
 TH.deriveLift ''SystemFOmega
 
-instance (Ord m, Ord p) => SimpleType (SystemFOmega m p) where
+instance (Ord m, Ord p, Ord k) => SimpleType (SystemFOmega m p (Maybe k)) where
     -- SystemFOmega's mono type is it's type parameter 'm'
-    type MonoType (SystemFOmega m p) = m
+    type MonoType (SystemFOmega m p (Maybe k)) = m
 
     -- Making a function type from one type to another involves
     -- using type application on the function arrow.
-    abstract a b = FunctionArrow /$ a /$ b
+    abstract a b = FunctionArrow `TypeAp` a `TypeAp` b
 
     reify (FunctionArrow `TypeAp` a `TypeAp` b) = Just (a, b)
     reify _                                     = Nothing
 
     bases = \case
-        Forall p sf  -> Set.insert (Poly p) (bases sf)
+        Forall _ sf  -> bases sf
         TypeAp tl tr -> bases tl `Set.union` bases tr
         a            -> Set.singleton a
 
     mono = Mono
 
+    equivalent = areAlphaEquivalent
 
-instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
+instance (Ord m, Ord p, Ord k) => Polymorphic (SystemFOmega m p (Maybe k)) where
 
-    type PolyType (SystemFOmega m p) = p
+    type PolyType (SystemFOmega m p (Maybe k)) = p
 
     substitutions = curry $ \case
             (Forall _ expr1    , expr2)              -> substitutions expr1 expr2
@@ -86,41 +91,47 @@ instance (Ord m, Ord p) => Polymorphic (SystemFOmega m p) where
             p'@(Poly p)
                 | p == target -> sub
                 | otherwise   -> p'
-            Forall p sf
+            Forall declr@(p, _) sf
                 | p == target -> applySubstitution' sf
-                | otherwise   -> Forall p (applySubstitution' sf)
+                | otherwise   -> Forall declr (applySubstitution' sf)
             TypeAp tl tr      -> TypeAp (applySubstitution' tl) (applySubstitution' tr)
 
-    quantify = Forall
-    unquantify (Forall a b) = Just (a, b)
-    unquantify _ = Nothing
+    quantify = Forall . flip (,) Nothing
 
     poly = Poly
 
-    freeTypeVariables = \case
-        p@(Poly _)    -> Set.singleton p
-        Forall p sf   -> Set.delete (Poly p) (freeTypeVariables sf)
-        TypeAp tl tr  -> freeTypeVariables tl <> freeTypeVariables tr
-        _             -> Set.empty
+    quantifiedOf = \case
+        Forall (p, _) texpr -> Set.insert (poly p) $ quantifiedOf texpr
+        TypeAp texpr1 texpr2 -> quantifiedOf texpr1 <> quantifiedOf texpr2
+        _ -> Set.empty
 
-instance (Ord m, Ord p) => HigherOrder (SystemFOmega m p) where
+instance (
+           Ord m
+         , Ord p
+         , Ord k
+         , Inferable (SystemFOmega m p) k
+         , TypingContext (SystemFOmega m p) k ~ InferenceContext (SystemFOmega m p) k)
+         => HigherOrder (SystemFOmega m p (Maybe k)) where
+    type Kindsystem (SystemFOmega m p (Maybe k)) = k
 
-    type Kindsystem (SystemFOmega m p) = (SimplyTyped Star)
+    type KindError (SystemFOmega m p (Maybe k)) =
+        Either (InferError (SystemFOmega m p) k)
+               (TypeError (SystemFOmega m p) k)
 
-    kind = \case
-        m@Mono{}      -> Constant m
-        -- The function arrow (→ in the psudocode) is a mono type of the kind (* -> * -> *)
-        FunctionArrow -> Constant FunctionArrow
-        p@Poly{}      -> Constant p
-        Forall _ sf   -> kind sf
-        TypeAp tl tr  -> Apply (kind tl) (kind tr)
+    type KindContext (SystemFOmega m p (Maybe k)) = (TypingContext (SystemFOmega m p) k)
+
+    kindcheck env texpr = case infer env texpr of
+        Left errs -> Left (Left <$> errs)
+        Right (env', texpr') -> case typecheck env' texpr' of
+            Left errs -> Left (Right <$> errs)
+            Right (env'', texpr'') -> Right (env'', texpr'')
 
     typeap = TypeAp
 
     untypeap (TypeAp a b) = Just (a, b)
     untypeap _ = Nothing
 
-instance (Data m, Data p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m p) where
+instance (Data m, Data p, Data k, Arbitrary m, Arbitrary p, Arbitrary k) => Arbitrary (SystemFOmega m p k) where
     -- TODO: remove instances of Data for m and p
     arbitrary = sized (generatorSRWith aliases) where
         aliases :: [AliasR Gen]
@@ -133,12 +144,12 @@ instance (Data m, Data p, Arbitrary m, Arbitrary p) => Arbitrary (SystemFOmega m
     Given a function arrow representation of type @m@, replace all
     matching mono types with the function arrow.
 -}
-markAsFunctionArrow :: Eq m => m -> SystemFOmega m p -> SystemFOmega m p
+markAsFunctionArrow :: Eq m => m -> SystemFOmega m p k -> SystemFOmega m p k
 markAsFunctionArrow sub = \case
     m@(Mono x)
         | x == sub -> FunctionArrow
         | otherwise -> m
     FunctionArrow -> FunctionArrow
-    Poly x -> Poly x
+    p@Poly{} -> p
     Forall p st -> Forall p (markAsFunctionArrow sub st)
     TypeAp t1 t2 -> TypeAp (markAsFunctionArrow sub t1) (markAsFunctionArrow sub t2)

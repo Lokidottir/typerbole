@@ -56,14 +56,13 @@ data SimplyTypedErr c v t =
     | STSimpleTypeErr (SimpleTypeErr t)
     deriving (Eq, Ord, Show)
 
-instance (Ord v, Ord m) => Typecheckable c v (SimplyTyped m) where
-    type TypingContext c v (SimplyTyped m) = (SimpleTypingContext c v (SimplyTyped m))
+instance (Ord m, Ord c, Ord v) => Typecheckable (LambdaTerm c v) (SimplyTyped m) where
+    type TypingContext (LambdaTerm c v) (SimplyTyped m) = (SimpleTypingContext c v (SimplyTyped m))
 
-    type TypeError c v (SimplyTyped m) =
+    type TypeError (LambdaTerm c v) (SimplyTyped m) =
         -- Using an ErrorContext because it can hold a lot of information.
         ErrorContext'
-            c
-            v
+            (LambdaTerm c v)
             (SimplyTyped m) (SimplyTypedErr c v (SimplyTyped m))
 
     typecheck env _expr =
