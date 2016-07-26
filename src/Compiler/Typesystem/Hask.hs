@@ -11,7 +11,7 @@ import Language.Haskell.TH.Syntax as TH (Type(..), Name(..), TyVarBndr(..))
 import Calculi.Lambda.Cube.HigherOrder
 import Calculi.Lambda.Cube.Polymorphic
 import Calculi.Lambda.Cube.SimpleType
-import Calculi.Lambda.Cube.Typechecking
+import Control.Typecheckable
 import qualified Data.Set as Set
 import Data.Semigroup
 

@@ -3,7 +3,7 @@ module Calculi.Lambda.Cube.HigherOrder where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
-import           Calculi.Lambda.Cube.Typechecking
+import           Control.Typecheckable
 import qualified Data.Map                                as Map
 
 {-|

@@ -4,6 +4,8 @@ module Calculi.Lambda (
     , UntypedLambdaExpr
       -- ** Analysis Helpers
     , freeVars
+      -- ** Name-related errors 
+    , NotKnownErr(..)
       -- * Let declaration helpers
     , LetDeclr
     , unlet
@@ -51,6 +53,19 @@ instance (Arbitrary c, Data c,
 type LetDeclr c v t = ((v, t), LambdaTerm c v t)
 
 type UntypedLambdaExpr c v = LambdaTerm c v ()
+
+{-|
+    Name-related errors, for when there's a variable, type or constant
+    that doesn't appear in the environment that was given to the typechecker.
+-}
+data NotKnownErr c v t =
+      UnknownType t
+    -- ^ A type appears that is not in scope
+    | UnknownVariable v
+    -- ^ A variable appears that is not in scope
+    | UnknownConstant c
+    -- ^ A constant appears that is not in scope
+    deriving (Eq, Ord, Show)
 
 {-|
     Given the contents of a let expression's declarations, generate a graph

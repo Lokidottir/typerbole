@@ -4,7 +4,7 @@ module Compiler.Typesystem.SimplyTyped where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
-import           Calculi.Lambda.Cube.Typechecking
+import           Control.Typecheckable
 import           Control.Monad
 import qualified Control.Monad.State            as State
 import           Data.Bifunctor

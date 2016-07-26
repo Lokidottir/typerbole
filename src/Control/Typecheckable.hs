@@ -4,7 +4,7 @@
     Module containing typechecking functions and data structures.
 
 -}
-module Calculi.Lambda.Cube.Typechecking (
+module Control.Typecheckable (
     -- * Typeclasses for Typechecking and Inference
       Typecheckable(..)
     , Inferable(..)
@@ -22,15 +22,8 @@ module Calculi.Lambda.Cube.Typechecking (
     , throwErrorContexts
     , errorOfContext
     , appendExprToEContexts
-    -- ** Simply-typed lambda calculus
-    , SimpleTypingContext(..)
-    , NotKnownErr(..)
-    , SimpleTypeErr(..)
 ) where
 
-
-import           Calculi.Lambda
-import           Calculi.Lambda.Cube.SimpleType
 import           Data.Bifunctor
 import           Control.Monad.State
 import           Control.Monad.Except
@@ -94,27 +87,6 @@ appendExprToEContexts expr = flip catchError (throwError . fmap (expression %~ (
 (<><>) = curry $ \case
     (Left a, Left b) -> Left (a <> b)
     (a, b)           -> (<>) <$> a <*> b
-
-{-|
-    Name-related errors, for when there's a variable, type or constant
-    that doesn't appear in the environment that was given to the typechecker.
--}
-data NotKnownErr c v t =
-      UnknownType t
-    -- ^ A type appears that is not in scope
-    | UnknownVariable v
-    -- ^ A variable appears that is not in scope
-    | UnknownConstant c
-    -- ^ A constant appears that is not in scope
-    deriving (Eq, Ord, Show)
-
-data SimpleTypeErr t =
-      NotAFunction t
-    -- ^ Attempted to split a type (a -> b) into (Just (a, b)), but the type wasn't
-    -- a function type.
-    | UnexpectedType t t
-    -- ^ The first type was expected during typechecking, but the second type was found.
-    deriving (Eq, Ord, Show)
 
 {-|
     Typechecking type, uses the TypingContext as state and TypeError as an exception type.

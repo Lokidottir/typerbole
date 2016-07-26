@@ -15,7 +15,7 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.HigherOrder
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.SimpleType
-import           Calculi.Lambda.Cube.Typechecking
+import           Control.Typecheckable
 import           Compiler.Typesystem.SimplyTyped (SimplyTyped)
 import qualified Language.Haskell.TH.Lift as TH
 import           Data.Bifunctor.TH

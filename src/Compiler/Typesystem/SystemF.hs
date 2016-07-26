@@ -9,7 +9,7 @@ import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Calculi.Lambda.Cube.Polymorphic
 import           Calculi.Lambda.Cube.Polymorphic.Unification
-import           Calculi.Lambda.Cube.Typechecking
+import           Control.Typecheckable
 import           Control.Monad
 import           Control.Monad.State
 import           Control.Monad.Except

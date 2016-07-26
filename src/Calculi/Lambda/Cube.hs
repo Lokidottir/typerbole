@@ -7,4 +7,3 @@ import           Calculi.Lambda.Cube.HigherOrder              as Cube
 import           Calculi.Lambda.Cube.Polymorphic              as Cube
 import           Calculi.Lambda.Cube.Polymorphic.Unification  as Cube
 import           Calculi.Lambda.Cube.SimpleType               as Cube
-import           Calculi.Lambda.Cube.Typechecking             as Cube

@@ -11,6 +11,7 @@ module Calculi.Lambda.Cube.SimpleType (
     , order
     -- * Typechecking
     , SimpleTypingContext(..)
+    , SimpleTypeErr(..)
     , variables
     , constants
     , allTypes
@@ -44,6 +45,17 @@ data SimpleTypingContext c v t = SimpleTypingContext {
     , _allTypes :: Set.Set t
       -- ^ All the base types in scope.
 } deriving (Show, Read, Eq, Ord)
+
+{-|
+    Type errors that can occur in a simply-typed lambda calculus.
+-}
+data SimpleTypeErr t =
+      NotAFunction t
+    -- ^ Attempted to split a type (a -> b) into (Just (a, b)), but the type wasn't
+    -- a function type.
+    | UnexpectedType t t
+    -- ^ The first type was expected during typechecking, but the second type was found.
+    deriving (Eq, Ord, Show)
 
 makeLenses ''SimpleTypingContext
 
