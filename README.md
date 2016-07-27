@@ -19,7 +19,7 @@ data LambdaTerm c v t =
 
 This datatype has 3 parameters. The first two parameters represent constants and variables respectively, what's important is the final parameter `t` which is the parameter for the typesystem being used.
 
-We can use the typesystem `SimplyTyped` in `Compiler.Typesystem.SimplyTyped` as the typesystem to make this a simply-typed lambda calculus, or we could slot in `SystemF`, `SystemFOmega`, `Hask`, to change the type system associcated with with it.
+We can use the typesystem `SimplyTyped` in `Compiler.Typesystem.SimplyTyped` as the typesystem to make this a simply-typed lambda calculus, or we could slot in `SystemF`, `SystemFOmega`, `Hask`, to change the typesystem associcated with with it.
 
 Sadly there's no magic that builds typecheckers for these (yet). Instead, using the language extensions `MultiParamTypeClasses` and `FlexibleInstances` and the `Typecheckable` typeclass from `Control.Typecheckable` we write a typechecker for each of these occurences.
 
@@ -49,6 +49,7 @@ The lambda cube describes the properties of a number of typesystems, an overview
 
 ### TODOs
 
+- [ ] Give `Calculi.Lambda.Cube.Polymorphic.Unification` better documentation (incl. diagrams for graph-related functions/anything that'll benefit).
 - [ ] Finish the `Typecheckable` & `Inferable` instances for the typesystems in `Compiler.Typesystem.*`
 - [ ] Put together a working travis file.
 - [ ] Document the type expression psudocode
@@ -57,15 +58,16 @@ The lambda cube describes the properties of a number of typesystems, an overview
 - [ ] Make the quasiquoters use the lambda cube typeclasses instead of specific typesystem implementations.
 - [ ] Subhask-style automated test writing.
 - [ ] Explore homotopy type theory
-- [ ] Remove all extensions that aren't light syntactic sugar from `default-extensions`
+- [ ] Remove all extensions that aren't light syntactic sugar from `default-extensions` and declare them explicitly in the modules they're used.
 - [ ] Listen to `-Wall`
-- [ ] Move `Control.Typecheckable` to it's own .
+- [ ] Move `Control.Typecheckable` to it's own package.
+- [ ] Elaborate on the `Typecheck` type. Maybe make it a typeclass.
 
 ### Papers, Sites and Books read during development
 
 * Introduction to generalized type systems, Dr Henk Barendregt (Journal of Functional Programming, April 1991)
 
-* A Modern Perspective on Type Theory, ISBN-10 1402023340 [(x)](https://www.amazon.co.uk/Modern-Perspective-Type-Theory-Origins/dp/1402023340)
+* A Modern Perspective on Type Theory [(x)](https://www.amazon.co.uk/Modern-Perspective-Type-Theory-Origins/dp/1402023340)
 
 * A proof of correctness for the Hindley-Milner type inference algorithm, Dr Jeff Vaughan [(x)](http://www.jeffvaughan.net/docs/hmproof.pdf)
 

@@ -1,16 +1,10 @@
 module Data.Graph.Inductive.Helper where
 
-import           Control.Monad
-import           Control.Lens hiding ((&))
 import           Data.Graph.Inductive as Graph
-import           Data.List
-import qualified Data.List.Ordered    as Ord
 import qualified Data.Map             as Map
 import           Data.Maybe
 import qualified Data.Set             as Set
-import           Data.Tuple
 import qualified Data.Tree            as Tree
-import qualified Data.List.NonEmpty   as NE
 import           Safe
 
 findRootPaths :: Graph gr => gr n e -> Graph.Context n e -> (Node, [[Node]])
@@ -126,7 +120,7 @@ unvalidatedEdgeyTopsort graph =
         finished the topsort
     -}
     let candidate = headMay $ gsel (null . inn') graph
-    in case (flip match graph . node' <$> candidate) of
+    in case flip match graph . node' <$> candidate of
         Nothing                 -> []
         Just (Nothing, _)       -> []
-        Just (Just ctx, graph') -> (fmap (\(_, _, l) -> (lab' ctx, l)) (out' ctx)) ++ unvalidatedEdgeyTopsort graph'
+        Just (Just ctx, graph') -> fmap (\(_, _, l) -> (lab' ctx, l)) (out' ctx) ++ unvalidatedEdgeyTopsort graph'

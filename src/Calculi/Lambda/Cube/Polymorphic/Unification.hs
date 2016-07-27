@@ -28,21 +28,17 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
 ) where
 
 import           Calculi.Lambda.Cube.Polymorphic
-import           Control.Applicative hiding (empty)
 import           Control.Lens as Lens
 import           Control.Monad
-import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Bifunctor
 import           Data.Either.Combinators
 import           Data.Either (partitionEithers)
 import           Data.Graph.Inductive as Graph hiding ((&))
 import           Data.Graph.Inductive.Helper
-import           Data.Function (on)
 import           Data.List.Ordered
-import           Data.List (groupBy, group, partition)
+import           Data.List (group)
 import           Data.Maybe
-import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
 import           Data.Tree
 
@@ -61,9 +57,7 @@ import           Data.Tree
 -}
 data SubsErr gr t p =
       MultipleSubstitutions (ConflictTree t p)
-    -- ^ There are multiple possible substitutions, the first argument here
-    -- is the type that has multiple substitutions and the second is the
-    -- list of all the conflicting substitutions' paths.
+    -- ^ A `ConflictTree` of substitutions leading to `p`
     | CyclicSubstitution (gr t p)
     -- ^ There is a cycle of substitutions.
     | SubsMismatch t t
