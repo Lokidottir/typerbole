@@ -1,7 +1,6 @@
 name:                typerbole
 version:             0.0.0.1
-synopsis:            Parameterized typesystems, lambda cube typeclasses,
-                     and typechecking interfaces.
+synopsis:            A typeystems library with exaggerated claims
 description:         Please see README.md
 license:             BSD3
 license-file:        LICENSE
@@ -16,6 +15,10 @@ category:            Typesystems
                    , AST
 build-type:          Simple
 cabal-version:       >=1.10
+extra-source-files:    README.md
+                     , lambdacube-overview.md
+                     , diagrams/typeclass-hierarchy.png
+                     , CONTRIBUTING.md
 
 library
   hs-source-dirs:      src

@@ -84,9 +84,9 @@ setOfInt = fromList [1,2,3,4,5]
 
 ## Dependent types
 
-Dependent types lets us have values in types at compile time. This can seem confusing, but when using typerbole you are manipulating type expressions as values, this just gives this ability to a programming language targeting a dependent lambda calculus by letting the programmer embed lambda terms (in this library, this means being able to convert a `LambdaTerm` value to a type) at the type level.
+Dependent types let us have values in types at compile time. This can seem confusing, but when using typerbole you are manipulating type expressions as values, this just gives this ability to a programming language targeting a dependent lambda calculus by letting the programmer embed value-level terms at the type level.
 
-<!-- Example wanted -->
+<!-- Examples wanted -->
 
 ***
 ##### Footnotes

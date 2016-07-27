@@ -1,6 +1,7 @@
 # typerbole
 
 Parameterized typesystems, lambda cube typeclasses, and typechecking interfaces.
+
 ## Parameterized Typesystems
 
 Like how datatypes such as `List a` (`[a]`), `Set a`, `Tree a` etc. in haskell have a parameter for a contained type, this library is based on the idea that a datatype that represents expressions can have a parameter for a typesystem.
@@ -32,6 +33,13 @@ instance (...) => Typecheckable (LambdaTerm c v) (SystemFOmega m p k) where
     ...
 -- and so on.
 ```
+
+Or we can just ignore it all and turn it into an untyped lambda calculus:
+
+```haskell
+type UntypedLambdaTerm c v = LambdaTerm c v ()
+```
+
 ## The Lambda Cube
 
 The lambda cube describes the properties of a number of typesystems, an overview can be found [**here**](./lambdacube-overview.md). It is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
@@ -52,6 +60,7 @@ The lambda cube describes the properties of a number of typesystems, an overview
 - [ ] Give `Calculi.Lambda.Cube.Polymorphic.Unification` better documentation (incl. diagrams for graph-related functions/anything that'll benefit).
 - [ ] Finish the `Typecheckable` & `Inferable` instances for the typesystems in `Compiler.Typesystem.*`
 - [ ] Put together a working travis file.
+- [ ] Implement a Calculus of Constructions typesystem.
 - [ ] Document the type expression psudocode
 - [ ] Design a typeclass for typesystems with constraints (`Num a => ...`, `a ~ T` etc).
 - [ ] Provide a default way of evaluating lambda expressions.
