@@ -1,6 +1,6 @@
 name:                typerbole
-version:             0.0.0.3
-synopsis:            A typeystems library with exaggerated claims
+version:             0.0.0.5
+synopsis:            A typesystems library with exaggerated claims
 description:         Please see README.md
 license:             BSD3
 license-file:        LICENSE
@@ -13,7 +13,7 @@ category:            Typesystems
                    , Typechecking
                    , Type Theory
                    , Educational
-                   , LambdaCube
+                   , Lambda Cube
                    , AST
 build-type:          Simple
 cabal-version:       >=1.10
@@ -36,7 +36,6 @@ library
                      , Calculi.Lambda.Cube.HigherOrder
                      , Calculi.Lambda.Cube.Dependent
                      , Calculi.Lambda.Cube.TH
-                     , Compiler.Typesystem.Hask
                      , Compiler.Typesystem.SystemF
                      , Compiler.Typesystem.SystemFOmega
                      , Compiler.Typesystem.SimplyTyped
@@ -54,9 +53,9 @@ library
                      , mtl
                      , generic-random == 0.1.1.0
                      , lens
-                     , template-haskell < 2.11
-                     , th-lift >= 0.7 && < 0.8
-                     , megaparsec < 5
+                     , template-haskell
+                     , th-lift
+                     , megaparsec
                      , safe
   ghc-options:         -Wall
                        -fno-warn-type-defaults

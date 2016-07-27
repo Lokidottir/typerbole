@@ -1,4 +1,4 @@
-# typerbole
+# typerbole ![hackage](https://img.shields.io/hackage/v/typerbole.svg?style=flat-square)
 
 Parameterized typesystems, lambda cube typeclasses, and typechecking interfaces.
 

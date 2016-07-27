@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Calculi.Lambda.Cube.TH (
      -- sfo
       sf
@@ -11,12 +12,17 @@ import qualified Compiler.Typesystem.SystemFOmega as SFO
 import qualified Compiler.Typesystem.SystemF as SF
 import qualified Compiler.Typesystem.SimplyTyped as STLC
 import Text.Megaparsec
+import Text.Megaparsec.Error
 import Calculi.Lambda.Cube
 import Data.List
 import Control.Monad
 
 -- | Lambda Cube parsec type.
+#if __GLASGOW_HASKELL__ >= 800
+type LCParsec = Parsec Dec String
+#else
 type LCParsec = Parsec String
+#endif
 -- | SystemFOmega with mono and poly types represented as strings.
 -- type StringSFO = SFO.SystemFOmega String String (Maybe (STLC.SimplyTyped String))
 -- | SystemF with mono and poly types represented as strings.
