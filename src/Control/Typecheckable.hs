@@ -140,4 +140,9 @@ class (Typecheckable term t) => Inferable term t where
     infer :: InferenceContext term t                  -- ^ The given context
           -> term (Maybe t)                           -- ^ The expression to infer from
           -> Either [InferError term t]
-                    (TypingContext term t, term t) -- ^ The result
+                    (InferenceContext term t, term t) -- ^ The result
+
+    {-|
+        Get a typing context from an inference context.
+    -}
+    typingContext :: InferenceContext term t -> TypingContext term t

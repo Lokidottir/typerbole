@@ -56,8 +56,6 @@ followsPolymorphic :: forall t.
                       )
                    => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
-    prop "follows quantify-unquantify inverse law"
-        (quantifyInverse :: PolyType t -> t -> Bool)
     prop "follows type-ordering rule ((forall a. a) ⊑ _ = True)"
         (typeOrderingRule :: t -> Bool)
     prop "lifts up quantification during abstraction"
@@ -106,9 +104,6 @@ followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
 abstractInverse :: (SimpleType t) => t -> t -> Bool
 abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
 
-quantifyInverse :: (Polymorphic t) => PolyType t -> t -> Bool
-quantifyInverse !ta !tb =
-    fmap (uncurry quantify) (unquantify (quantify ta tb)) == Just (quantify ta tb)
 
 typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
@@ -145,8 +140,8 @@ unifyR2 !t1 !t2 =
 -}
 unifyR1Predicate (t1, t2) =
     t1'tvs `disjoint` t2'tvs && hasSubstitutions t1 t2 && not (t1 ==== t2) where
-        t1'tvs = typeVariables t1
-        t2'tvs = typeVariables t2
+        t1'tvs = polytypesOf t1
+        t2'tvs = polytypesOf t2
 
 disjoint a b = Set.difference a b == a
 

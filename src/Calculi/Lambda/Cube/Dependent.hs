@@ -1,25 +1,21 @@
 module Calculi.Lambda.Cube.Dependent where
 
-import           Calculi.Lambda
-import           Calculi.Lambda.Cube.SimpleType
+import Calculi.Lambda.Cube.SimpleType
 
 {-|
     Typesystems which can have values in their types.
 -}
 class SimpleType t => Dependent t where
-
+    
     {-|
-        The type representing value-level variables at the type level.
-    -}
-    type DependentVariable t :: *
+        A value-level term that can be encoded as a type expression.
 
-    {-|
-        The type representing value-level constants at the type level.
+        Of kind @* -> *@ because it expects a typesystem as a parameter.
     -}
-    type DependentConstant t :: *
+    type DependentTerm t :: * -> *
 
     {-|
         Encode a value at the type-level. This could be just a constructor or
         a complete transformation of the AST, but this typeclass doesn't care.
     -}
-    valueToType :: LambdaTerm (DependentConstant t) (DependentVariable t) t -> t
+    valueToType :: (DependentTerm t) t -> t

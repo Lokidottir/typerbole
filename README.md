@@ -1,12 +1,11 @@
 # typerbole
 
-A library classifying typesystems with typeclasses.
-
+Parameterized typesystems, lambda cube typeclasses, and typechecking interfaces.
 ## Parameterized Typesystems
 
 Like how datatypes such as `List a` (`[a]`), `Set a`, `Tree a` etc. in haskell have a parameter for a contained type, this library is based on the idea that a datatype that represents expressions can have a parameter for a typesystem.
 
-### The Lambda Calculus
+### An Example: The Lambda Calculus
 
 As an example, we can put together a datatype that represents the syntax for the Lambda Calculus:
 
@@ -20,6 +19,19 @@ data LambdaTerm c v t =
 
 This datatype has 3 parameters. The first two parameters represent constants and variables respectively, what's important is the final parameter `t` which is the parameter for the typesystem being used.
 
+We can use the typesystem `SimplyTyped` in `Compiler.Typesystem.SimplyTyped` as the typesystem to make this a simply-typed lambda calculus, or we could slot in `SystemF`, `SystemFOmega`, `Hask`, to change the type system associcated with with it.
+
+Sadly there's no magic that builds typecheckers for these (yet). Instead, using the language extensions `MultiParamTypeClasses` and `FlexibleInstances` and the `Typecheckable` typeclass from `Control.Typecheckable` we write a typechecker for each of these occurences.
+
+```haskell
+instance (...) => Typecheckable (LambdaTerm c v) (SimplyTyped m) where
+    ...
+instance (...) => Typecheckable (LambdaTerm c v) (SystemF m p) where
+    ...
+instance (...) => Typecheckable (LambdaTerm c v) (SystemFOmega m p k) where
+    ...
+-- and so on.
+```
 ## The Lambda Cube
 
 The lambda cube describes the properties of a number of typesystems, an overview can be found [**here**](./lambdacube-overview.md). It is the basis for the library's classification of typesystems, a typeclass hierarchy where each axis is represented by a typeclass whose methods and associated types are indicitive of the properties of the axis.
@@ -37,11 +49,26 @@ The lambda cube describes the properties of a number of typesystems, an overview
 
 ### TODOs
 
+- [ ] Finish the `Typecheckable` & `Inferable` instances for the typesystems in `Compiler.Typesystem.*`
 - [ ] Put together a working travis file.
 - [ ] Document the type expression psudocode
 - [ ] Design a typeclass for typesystems with constraints (`Num a => ...`, `a ~ T` etc).
 - [ ] Provide a default way of evaluating lambda expressions.
 - [ ] Make the quasiquoters use the lambda cube typeclasses instead of specific typesystem implementations.
 - [ ] Subhask-style automated test writing.
-- [ ] More formally represent typing rules instead of just implementing typesystems ad-hoc and hoping they are at least equivalent (Would require a significant amount of refectoring, if it gets to a point where the library becomes less accessable then stick with the ad-hoc approach).
 - [ ] Explore homotopy type theory
+- [ ] Remove all extensions that aren't light syntactic sugar from `default-extensions`
+- [ ] Listen to `-Wall`
+- [ ] Move `Control.Typecheckable` to it's own .
+
+### Papers, Sites and Books read during development
+
+* Introduction to generalized type systems, Dr Henk Barendregt (Journal of Functional Programming, April 1991)
+
+* A Modern Perspective on Type Theory, ISBN-10 1402023340 [(x)](https://www.amazon.co.uk/Modern-Perspective-Type-Theory-Origins/dp/1402023340)
+
+* A proof of correctness for the Hindley-Milner type inference algorithm, Dr Jeff Vaughan [(x)](http://www.jeffvaughan.net/docs/hmproof.pdf)
+
+* Compositional Type Checking for Hindley-Milner Type Systems with Ad-hoc Polymorphism, Dr. Gergő Érdi [(x)](https://gergo.erdi.hu/elte/thesis.pdf)
+
+* Many wikipedia pages on type theory.
