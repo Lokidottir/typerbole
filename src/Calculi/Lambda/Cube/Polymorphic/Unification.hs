@@ -165,37 +165,7 @@ hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Either [SubsErr Gr t p] [(t, p)
 resolveMutuals :: forall t p. (Polymorphic t, p ~ PolyType t)
                => [Substitution t p] -- ^ The list of mixed (see `Substitution`) substitutions.
                -> [(t, p)] -- ^ The resulting list of substitutions
-resolveMutuals subs =
-    let (mutuals, subs') = partitionSubstitutions subs
-    -- As a mutual substitution (a,b) means that a is b, every substitution
-    -- of the form (T, a) must be duplicated to include (T, b), and every
-    -- substitution of the form (M, b) must be duplicated to include (M, a).
-
-    -- If a future maintainer changes this to a foldl, they should reverse the
-    -- output of sortMutuals (if that's stil a part of this code).
-    in foldr expandMutual subs' (sortMutuals subs' mutuals) where
-        expandMutual :: (p, p) -> [(t, p)] -> [(t, p)]
-        expandMutual (a, b) _subs = do
-            -- Get the single substitution
-            sub@(term, var) <- _subs
-            -- if either a or b are equal to var then duplicate the substitution.
-            if a == var || b == var then [(term, a), (term, b)] else return sub
-
-        {-
-            Reorder the mutuals so that they're resolved in an order that
-            doesn't miss out on duplications.
-
-            NOTE: This is a bodge, a proper topsort of these needs to be done as part
-                  of a graph transform, probably.
-            NOTE: re: above. Extensive tests haven't really come up with a contradiction
-                  to this working, so maybe it's okay? I don't trust it though.
-        -}
-        sortMutuals :: [(t, p)] -> [(p, p)] -> [(p, p)]
-        sortMutuals _subs = sortOn (\(a, b) -> max (subCount a) (subCount b)) where
-            -- Find the number of times a polytype is substituted (Should be 1 or 0, could be more
-            -- but that'll be caught by the occurs check later).
-            subCount :: p -> Integer
-            subCount sub = foldr (\(_, sub') -> if sub' == sub then (+ 1) else id ) 0 _subs
+resolveMutuals subs = undefined
 
 {-|
     Type ordering operator, true if the second argument is more specific or equal to
@@ -234,7 +204,7 @@ resolveMutuals subs =
 t ⊑ t' = fromRight False $ do
     subs <- resolveMutuals <$> substitutionsM t' t
     applySubs <- applyAllSubsGr subs
-    return (t' ≣ applySubs t)
+    return (areAlphaEquivalent t' (applySubs t))
 
 infix 4 ⊑
 
