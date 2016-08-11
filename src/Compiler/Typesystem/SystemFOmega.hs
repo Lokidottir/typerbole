@@ -77,8 +77,8 @@ instance (Ord m, Ord p, Ord k) => Polymorphic (SystemFOmega m p (Maybe k)) where
             (Forall _ expr1    , expr2)              -> substitutions expr1 expr2
             (expr1             , Forall _ expr2)     -> substitutions expr1 expr2
             (Poly p1           , Poly p2)            -> Right [Mutual p1 p2]
-            (expr              , Poly p)             -> Right [Substitution expr p]
-            (Poly p            , expr)               -> Right [Substitution expr p]
+            (expr              , Poly p)             -> Right [Replace expr p]
+            (Poly p            , expr)               -> Right [Replace expr p]
             (TypeAp arg1 ret1  , TypeAp arg2 ret2)   -> substitutions arg1 arg2 <><> substitutions ret1 ret2
             (expr1             , expr2)
                 | expr1 == expr2 -> Right []
@@ -101,9 +101,15 @@ instance (Ord m, Ord p, Ord k) => Polymorphic (SystemFOmega m p (Maybe k)) where
     poly = Poly
 
     quantifiedOf = \case
-        Forall (p, _) texpr -> Set.insert (poly p) $ quantifiedOf texpr
+        Forall (p, _) texpr  -> Set.insert (poly p) $ quantifiedOf texpr
         TypeAp texpr1 texpr2 -> quantifiedOf texpr1 <> quantifiedOf texpr2
-        _ -> Set.empty
+        _                    -> Set.empty
+
+    polytypesOf = \case
+        Forall _ texpr       -> polytypesOf texpr
+        TypeAp texpr1 texpr2 -> polytypesOf texpr1 <> polytypesOf texpr2
+        p@Poly{}             -> Set.singleton p
+        _                    -> Set.empty
 
 instance (
            Ord m
