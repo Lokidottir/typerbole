@@ -28,6 +28,7 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
 ) where
 
 import           Calculi.Lambda.Cube.Polymorphic
+import           Calculi.Lambda.Cube.SimpleType ((====))
 import           Control.Lens as Lens
 import           Control.Monad
 import           Control.Monad.State
@@ -150,7 +151,7 @@ unifyGr = unify
 -}
 partitionSubstitutions :: [Substitution t p] -> ([(p, p)], [(t, p)])
 partitionSubstitutions =
-    partitionEithers . fmap (\case (Mutual x y) -> Left (x, y); (Substitution x y) -> Right (x, y);)
+    partitionEithers . fmap (\case (Mutual x y) -> Left (x, y); (Replace x y) -> Right (x, y);)
 
 {-|
     Test to see if two types have valid substitutions between eachother.
@@ -162,10 +163,78 @@ hasSubstitutions t1 t2 = isRight (unify t1 t2 :: Either [SubsErr Gr t p] [(t, p)
     Given a list of substitutions, resolve all the mutual substitutions and
     return a list of substitutions in the form @(t, p)@.
 -}
+resolveMutualsNew :: forall t p. (Polymorphic t, p ~ PolyType t)
+               => [Substitution t p]
+               -- ^ The list of mixed (see `Substitution`) substitutions.
+               -> [(t, p)]
+               -- ^ The resulting list of substitutions, or a list of substitution errors
+resolveMutualsNew subs =
+    let {-
+            Split the list of substitutions into mutual and non-mutual substitutions.
+        -}
+        (muts, subs') = partitionSubstitutions subs
+
+        {-
+            A graph of all the mutual substitutions.
+        -}
+        mutsGraph :: Gr p ()
+        mutsGraph = run_ empty $ do
+            insMapNodesM (muts >>= (\(p1,p2) -> [p1, p2]))
+            insMapEdgesM $ (\(p1, p2) -> (p1, p2, ())) <$> muts
+
+        {-
+            perform a transform on the
+        -}
+        muts' :: [(t, p)]
+        muts' = undefined
+    in subs' ++ muts'
+
+{-|
+
+-}
+duplicateSubstitution :: (Eq p, Eq t) => (p, p) -> [(t, p)] -> [(t, p)]
+duplicateSubstitution (a, b) subs = do
+    -- Get the single substitution
+    sub@(term, var) <- subs
+    -- if either a or b are equal to var then duplicate the substitution.
+    if a == var || b == var then [(term, a), (term, b)] else return sub
+
+{-|
+    Reorder the mutuals so that they're resolved in an order that
+    doesn't miss out on duplications.
+
+    NOTE: This is a bodge, a proper topsort of these needs to be done as part
+          of a graph transform, probably.
+-}
+sortMutuals :: forall t p. Eq p => [(t, p)] -> [(p, p)] -> [(p, p)]
+sortMutuals subs = sortOn (\(a, b) -> max (subCount a) (subCount b)) where
+    -- Find the number of times a polytype is substituted (Should be 1 or 0, could be more
+    -- but that'll be caught by the occurs check later).
+    subCount :: p -> Integer
+    subCount sub = foldr (\(_, sub') -> if sub' == sub then (+ 1) else id ) 0 subs
+
+{-|
+    Given a list of substitutions, resolve all the mutual substitutions and
+    return a list of substitutions in the form @(t, p)@.
+-}
 resolveMutuals :: forall t p. (Polymorphic t, p ~ PolyType t)
                => [Substitution t p] -- ^ The list of mixed (see `Substitution`) substitutions.
                -> [(t, p)] -- ^ The resulting list of substitutions
-resolveMutuals subs = undefined
+resolveMutuals subs =
+    let (mutuals, subs') = partitionSubstitutions subs
+    -- As a mutual substitution (a,b) means that a is b, every substitution
+    -- of the form (T, a) must be duplicated to include (T, b), and every
+    -- substitution of the form (M, b) must be duplicated to include (M, a).
+
+    -- If a future maintainer changes this to a foldl, they should reverse the
+    -- output of sortMutuals (if that's stil a part of this code).
+    in foldr expandMutual subs' (sortMutuals subs' mutuals) where
+        expandMutual :: (p, p) -> [(t, p)] -> [(t, p)]
+        expandMutual (a, b) _subs = do
+            -- Get the single substitution
+            sub@(term, var) <- _subs
+            -- if either a or b are equal to var then duplicate the substitution.
+            if a == var || b == var then [(term, a), (term, b)] else return sub
 
 {-|
     Type ordering operator, true if the second argument is more specific or equal to
@@ -204,7 +273,7 @@ resolveMutuals subs = undefined
 t ⊑ t' = fromRight False $ do
     subs <- resolveMutuals <$> substitutionsM t' t
     applySubs <- applyAllSubsGr subs
-    return (areAlphaEquivalent t' (applySubs t))
+    return (t' ==== applySubs t)
 
 infix 4 ⊑
 
