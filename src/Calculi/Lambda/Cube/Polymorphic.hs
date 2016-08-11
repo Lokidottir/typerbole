@@ -7,15 +7,15 @@ module Calculi.Lambda.Cube.Polymorphic (
       Polymorphic(..)
     , Substitution(..)
     -- ** Notation and related functions
+    , quantifyMany
     , areAlphaEquivalent
-    , (≣)
     , (\-/)
     , generalise
     , generalise'
-    , polytypesOf
     , boundPolytypesOf
     , monotypesOf
     , isPolyType
+    , toPolyType
     -- ** Typechecking context
     , SubsContext(..)
     , SubsContext'
@@ -26,8 +26,11 @@ module Calculi.Lambda.Cube.Polymorphic (
 
 import           Calculi.Lambda.Cube.SimpleType
 import           Data.Either.Combinators
+import           Data.List.Ordered
+import           Data.Maybe
 import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
+import           Data.Semigroup
 import           Control.Lens as Lens hiding ((&))
 
 {-|
@@ -49,7 +52,7 @@ makeLenses ''SubsContext
 data Substitution t p =
       Mutual p p
       -- ^ Two equivalent polytypes that could substitute eachother.
-    | Substitution t p
+    | Replace t p
       -- ^ A substitution of type expression @t@ over polytype @p@
     deriving (Eq, Ord, Show)
 
@@ -202,12 +205,10 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
     quantifiedOf :: t -> Set.Set t
 
 {-|
-    Infix `areAlphaEquivalent`
+    Quantify a number of variables in a foldable data type.
 -}
-(≣) :: Polymorphic t => t -> t -> Bool
-(≣) = areAlphaEquivalent
-
-infix 4 ≣
+quantifyMany :: (Polymorphic t, Foldable f) => f (PolyType t) -> t -> t
+quantifyMany ps t = foldr quantify t ps
 
 {-|
     Infix `quantify`, looks a bit like @∀@ but doesn't interfere with unicode syntax extensions.
@@ -246,7 +247,7 @@ monotypesOf t = Set.difference (bases t) (polytypesOf t)
     (∀ c. a → b → c)
 -}
 generalise :: forall t. Polymorphic t => Set.Set t -> t -> t
-generalise exclude t = foldr quantify t ftvsBare where
+generalise exclude t = quantifyMany ftvsBare t where
     ftvsBare :: Set.Set (PolyType t)
     ftvsBare = Set.fromList $ snd <$> filter (flip Set.member ftvs . fst) polyTypes where
         ftvs = Set.difference (freePolytypesOf t) exclude
@@ -272,13 +273,27 @@ generalise' = generalise Set.empty
 
     >>> areAlphaEquivalent (∀ a. a) (∀ z. z → z)
     False
+
+    >>> areAlphaEquivalent (∀ a. a -> a) (∀ b. c -> b)
+    False
 -}
 areAlphaEquivalent :: forall t. Polymorphic t => t -> t -> Bool
-areAlphaEquivalent x y = fromRight False $ all isMutual <$> subs where
-    subs = substitutions x y
-
-    isMutual (Mutual _ _) = True
-    isMutual _            = False
+areAlphaEquivalent x y =
+    let -- "go" is a terrible thing to name this, it's completely non-descriptive.
+        go :: Substitution t (PolyType t)
+           -> Maybe (Map.Map (PolyType t) (PolyType t))
+           -> Maybe (Map.Map (PolyType t) (PolyType t))
+        go _ Nothing               = Nothing -- If there's no Map, then return nothing
+        go (Replace _ _ ) _   = Nothing -- If a non-mutual substitution appears, the type expressions aren't alpha equivalent
+        go (Mutual p1 p2) (Just m) = do
+            lookP1 <- return . fromMaybe True $ do
+                lookP1' <- Map.lookup p1 m
+                return (lookP1' == p2)
+            lookP2 <- return . fromMaybe True $ do
+                lookP1' <- Map.lookup p2 m
+                return (lookP1' == p1)
+            if lookP1 && lookP2 then return (Map.fromList [(p1, p2), (p2, p1)] <> m) else Nothing
+    in isJust . fromRight Nothing $ foldr go (Just Map.empty) . nubSort <$> substitutions x y
 
 {-|
     Tests if a type expression is a base poly type.
@@ -295,5 +310,14 @@ areAlphaEquivalent x y = fromRight False $ all isMutual <$> subs where
 isPolyType :: Polymorphic t => t -> Bool
 isPolyType t =
     fromRight False $ substitutions t t <&> \case
-        [Mutual a b] -> a == b && t == poly a
+        [Mutual a b] -> a == b && t ==== poly a
         _            -> False
+
+{-|
+    Pull out a poly type representation from a poly type.
+-}
+toPolyType :: Polymorphic t => t -> Maybe (PolyType t)
+toPolyType t = case substitutions t t of
+    Right [Mutual a _]
+        | poly a == t  -> Just a
+    _                  -> Nothing

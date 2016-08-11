@@ -1,10 +1,10 @@
 module Calculi.Lambda (
       -- * Typed Lambda Calculus AST.
       LambdaTerm(..)
-    , UntypedLambdaExpr
+    , UntypedLambdaTerm
       -- ** Analysis Helpers
     , freeVars
-      -- ** Name-related errors 
+      -- ** Name-related errors
     , NotKnownErr(..)
       -- * Let declaration helpers
     , LetDeclr
@@ -14,6 +14,7 @@ module Calculi.Lambda (
 ) where
 
 import           Data.Bifunctor.TH
+import           Data.Bifunctor (second)
 import           Data.Either.Combinators
 import           Data.Either (lefts, partitionEithers)
 import           Data.Generics (Data(..))
@@ -45,6 +46,9 @@ deriveBifunctor ''LambdaTerm
 deriveBifoldable ''LambdaTerm
 deriveBitraversable ''LambdaTerm
 
+instance Functor (LambdaTerm c v) where
+    fmap = second
+
 instance (Arbitrary c, Data c,
           Arbitrary v, Data v,
           Arbitrary t, Data t) => Arbitrary (LambdaTerm c v t) where
@@ -52,7 +56,7 @@ instance (Arbitrary c, Data c,
 
 type LetDeclr c v t = ((v, t), LambdaTerm c v t)
 
-type UntypedLambdaExpr c v = LambdaTerm c v ()
+type UntypedLambdaTerm c v = LambdaTerm c v ()
 
 {-|
     Name-related errors, for when there's a variable, type or constant

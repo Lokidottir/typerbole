@@ -18,7 +18,7 @@ import Data.List
 import Control.Monad
 
 -- | Lambda Cube parsec type.
-#if __GLASGOW_HASKELL__ >= 800
+#if MIN_VERSION_megaparsec(5,0,0)
 type LCParsec = Parsec Dec String
 #else
 type LCParsec = Parsec String
