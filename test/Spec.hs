@@ -32,12 +32,12 @@ main = hspec $ do
         describe "System-Fω" $ do
             followsSimpleType (arbitrary :: Gen SystemFOmega')
             followsPolymorphic (arbitrary :: Gen SystemFOmega')
-            followsHigherOrder (arbitrary :: Gen SystemFOmega')
+            -- followsHigherOrder (arbitrary :: Gen SystemFOmega')
 
     unificationRules (arbitrary :: Gen SystemF')
 
 type SimplyTyped' = SimplyTyped AlphabetUpper
-type SystemFOmega' = SystemFOmega AlphabetUpper AlphabetLow
+type SystemFOmega' = SystemFOmega AlphabetUpper AlphabetLow (Maybe (SimplyTyped AlphabetUpper))
 type SystemF' = SF.SystemF AlphabetUpper AlphabetLow
 
 followsSimpleType :: forall t. (SimpleType t, Show t, Arbitrary t) => Gen t -> Spec
@@ -87,7 +87,7 @@ unificationRules _ = describe "Unification rules and properties" $ do
         arbitrary' :: Gen (t, t)
         arbitrary' = frequency [(9, arbitrary), (1, endomorphism)] where
             -- Endomorphisms (type expressions of the form "forall a. a -> a")
-            -- paired with a type expression generaed with the regular
+            -- paired with a type expression generated with the regular
             -- Arbitrary instance.
             endomorphism = do
                 tvar <- arbitrary :: Gen (PolyType t)
@@ -99,11 +99,11 @@ followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
     prop "follows typeap-untypeap inverse law" $ (typeapInverse ::  t -> t -> Bool)
 
 {-|
-    Check that `reify` is the inverse (within a Maybe) of `abstract`.
+    Check that `reify` is the inverse (within a Maybe) of `abstract` (with respect to `equivalent`).
 -}
 abstractInverse :: (SimpleType t) => t -> t -> Bool
-abstractInverse !ta !tb = fmap (uncurry (/->)) (reify (ta /-> tb)) == Just (ta /-> tb)
-
+abstractInverse !ta !tb =
+    fromMaybe False $ reify (ta /-> tb) >>= (\(ta', tb') -> return (ta ==== ta' && tb ==== tb'))
 
 typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
@@ -115,19 +115,19 @@ typeOrderingRule !t = poly (toEnum 9999) ⊑ t
     Assert that `abstract` lifts all of the quantifiers to the result.
 -}
 liftQuantifiersRule :: (Polymorphic t, PolyType t ~ p) => t -> p -> Bool
-liftQuantifiersRule t p = t /-> quantify p (poly p) == quantify p (t /-> poly p)
+liftQuantifiersRule t p = t /-> quantify p (poly p) ==== quantify p (t /-> poly p)
 
 unifyR1 :: forall t e. (Enum e, Polymorphic t, Show t, PolyType t ~ e) => t -> t -> Bool
 unifyR1 !t1 !t2 =
     -- If the unification returns errors, then return true as
     -- this rule is checking the property itself, not the substitution errors.
-    fromRight True $ do
+    fromRight False $ do
         subs <- unify t1 t2
         u <- applyAllSubsGr subs
         return (u t1 ==== u t2)
 
 unifyR2 !t1 !t2 =
-    fromRight True $ do
+    fromRight False $ do
         subs <- unify t1 t2
         u <- applyAllSubsGr subs
         return $
@@ -143,31 +143,31 @@ unifyR1Predicate (t1, t2) =
         t1'tvs = polytypesOf t1
         t2'tvs = polytypesOf t2
 
-disjoint a b = Set.difference a b == a
+disjoint a b = Set.intersection a b == Set.empty
 
 newtype AlphabetLow = AlphabetLow Integer deriving (Eq, Ord, Enum, Data, Typeable)
 
 instance Arbitrary AlphabetLow where
-    arbitrary = AlphabetLow <$> elements [0..35]
+    arbitrary = AlphabetLow <$> elements [0..25]
 
 instance Show AlphabetLow where
     show (AlphabetLow n) = char : if suffix == 0 then
         "" else show suffix where
-            suffix = (n - charNum) `div` 36
+            suffix = (n - charNum) `div` 26
 
-            charNum = n `mod` 36
+            charNum = n `mod` 26
 
-            char = (cycle ['a'..'z']) !! fromEnum charNum
+            char = cycle ['a'..'z'] !! fromEnum charNum
 
 newtype AlphabetUpper = AlphabetUpper Integer deriving (Eq, Ord, Enum, Data, Typeable)
 
 instance Arbitrary AlphabetUpper where
-    arbitrary = AlphabetUpper <$> elements [0..35]
+    arbitrary = AlphabetUpper <$> elements [0..25]
 
 instance Show AlphabetUpper where
-    show (AlphabetUpper n) = char : if suffix == 0 then "" else (show suffix) where
-        suffix = (n - charNum) `div` 36
+    show (AlphabetUpper n) = char : if suffix == 0 then "" else show suffix where
+        suffix = (n - charNum) `div` 26
 
-        charNum = n `mod` 36
+        charNum = n `mod` 26
 
-        char = (cycle ['A'..'Z']) !! fromEnum charNum
+        char = cycle ['A'..'Z'] !! fromEnum charNum

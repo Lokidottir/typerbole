@@ -13,7 +13,7 @@ import           Control.Typecheckable
 import           Control.Monad
 import           Control.Monad.State
 import           Control.Monad.Except
-import           Control.Lens hiding (elements)
+import           Control.Lens hiding (elements, from, to)
 import           Data.Either.Combinators
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -33,10 +33,34 @@ import qualified Language.Haskell.TH.Lift as TH
 -}
 data SystemF m p =
       Mono m
+      -- ^ Mono types/type constants, i.e. @Int@ or @String@
     | Poly p
+      -- ^ Poly types/type variables, i. e. the @a@ in @forall a. a -> Int@
     | Function (SystemF m p) (SystemF m p)
+      -- ^ Function type constructor, i e. @->@ in @a -> b@
     | Forall p (SystemF m p)
+      -- ^ Universal quantifier, the @forall@ in @forall a. a@
     deriving (Eq, Ord, Data)
+
+data SystemFContext c v t p = SystemFContext {
+      _polyctx :: SubsContext t p
+      -- ^ The context for Polymorphic related information
+    , _stlcctx :: SimpleTypingContext c v t
+      -- ^ The context for Simply-typed related information.
+} deriving (Eq, Ord, Show)
+
+makeLenses ''SystemFContext
+
+{-|
+    Error sum not within Eithers because those (GHC) type errors are messy.
+-}
+data SystemFErr c v t =
+      SFNotKnownErr (NotKnownErr c v t)
+    | SFSimpleTypeErr (SimpleTypeErr t)
+    | SFSubsErr (SubsErr Gr t (PolyType t))
+
+deriving instance (Polymorphic t, Eq v, Eq c) => Eq (SystemFErr c v t)
+deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => Show (SystemFErr c v t)
 
 instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
     show (Mono m) = show m
@@ -63,7 +87,7 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     type MonoType (SystemF m p) = m
 
-    abstract = Function
+    abstract a b = systemFRaiseQuantifiers $ Function a b
 
     reify (Function a b) = Just (a, b)
     reify _              = Nothing
@@ -81,17 +105,12 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
 
     type PolyType (SystemF m p) = p
 
-    substitutions =
-        let (<><>) :: (Semigroup s1, Semigroup s2) => Either s1 s2 -> Either s1 s2 -> Either s1 s2
-            (<><>) = curry $ \case
-                (Left a, Left b) -> Left (a <> b)
-                (a, b) -> (<>) <$> a <*> b
-        in curry $ \case
+    substitutions = curry $ \case
             (Forall _ expr1    , expr2)              -> substitutions expr1 expr2
             (expr1             , Forall _ expr2)     -> substitutions expr1 expr2
             (Poly p1           , Poly p2)            -> Right [Mutual p1 p2]
-            (expr              , Poly p)             -> Right [Substitution expr p]
-            (Poly p            , expr)               -> Right [Substitution expr p]
+            (expr              , Poly p)             -> Right [Replace expr p]
+            (Poly p            , expr)               -> Right [Replace expr p]
             (Function arg1 ret1, Function arg2 ret2) -> substitutions arg1 arg2 <><> substitutions ret1 ret2
             (expr1             , expr2)
                 | expr1 == expr2 -> Right []
@@ -121,27 +140,8 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
     polytypesOf = \case
         Mono _ -> Set.empty
         p@Poly{} -> Set.singleton p
-
-
-{-|
-    Error sum not within Eithers because those (GHC) type errors are messy.
--}
-data SystemFErr c v t =
-      SFNotKnownErr (NotKnownErr c v t)
-    | SFSimpleTypeErr (SimpleTypeErr t)
-    | SFSubsErr (SubsErr Gr t (PolyType t))
-
-deriving instance (Polymorphic t, Eq v, Eq c) => Eq (SystemFErr c v t)
-deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => Show (SystemFErr c v t)
-
-data SystemFContext c v t p = SystemFContext {
-      _polyctx :: SubsContext t p
-      -- ^ The context for Polymorphic related information
-    , _stlcctx :: SimpleTypingContext c v t
-      -- ^ The context for Simply-typed related information.
-} deriving (Eq, Ord, Show)
-
-makeLenses ''SystemFContext
+        Function from to -> polytypesOf from <> polytypesOf to
+        Forall _ expr -> polytypesOf expr
 
 instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF m p) where
 
@@ -234,15 +234,38 @@ instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (
         {-
             Remove all generated quantifications and then generalise the expression's poly types.
         -}
-        process = generalise' . massUnquantify where
-            {-
-                Actually, remove all quantifications as we don't actually care about them during
-                substitution, which is most of what's getting tested.
+        process = generalise' . systemFMassUnquantify
 
-                Also SystemF doesn't do existential quantification by default (probably?)
-            -}
-            massUnquantify :: SystemF m p -> SystemF m p
-            massUnquantify t@Mono{} = t
-            massUnquantify t@Poly{} = t
-            massUnquantify (Function from to) = massUnquantify from /-> massUnquantify to
-            massUnquantify (Forall _ texpr) = massUnquantify texpr
+{-|
+    Internal function, makes sure all universal quantifiers appear at the \"top\" of
+    the type expression.
+
+    ===Behaviour
+
+    * Incorrectly quantified type expression
+
+        >>> systemFRaiseQuantifiers [sf| forall a b. a -> (forall c. b -> c) |]
+        [sf| forall a b c. a -> b -> c |]
+
+    * No quantifiers
+
+        >>> systemFRaiseQuantifiers [sf| X |]
+        [sf| X |]
+
+    * Already correctly quantified.
+
+        >>> systemFRaiseQuantifiers [sf| forall a b. a -> b |]
+        [sf| forall a b. a -> b |]
+-}
+systemFRaiseQuantifiers :: (Ord m, Ord p) => SystemF m p -> SystemF m p
+systemFRaiseQuantifiers t =
+    foldr (\case (Poly p) -> quantify p; _ -> error "tried to raise a non-polytype") (systemFMassUnquantify t) (quantifiedOf t)
+
+{-|
+    Remove all quantifications from a SystemF expression.
+-}
+systemFMassUnquantify :: (Ord m, Ord p) => SystemF m p -> SystemF m p
+systemFMassUnquantify t@Mono{} = t
+systemFMassUnquantify t@Poly{} = t
+systemFMassUnquantify (Function from to) = Function (systemFMassUnquantify from) (systemFMassUnquantify to)
+systemFMassUnquantify (Forall _ texpr) = systemFMassUnquantify texpr
