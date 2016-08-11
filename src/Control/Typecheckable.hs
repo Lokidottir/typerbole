@@ -25,15 +25,10 @@ module Control.Typecheckable (
     , appendExprToEContexts
 ) where
 
-import           Data.Bifunctor
 import           Control.Monad.State
 import           Control.Monad.Except
 import           Data.Semigroup
-import qualified Data.Map            as Map
-import qualified Data.Set            as Set
-import qualified Data.List.NonEmpty  as NE
 import           Control.Lens
-import           Data.Tree           as Tree
 
 {-|
     Data type for an error context, holding the expression where
@@ -63,11 +58,22 @@ instance Functor (ErrorContext env expr) where
 {-|
     Throw an error in an 'ErrorContext'.
 -}
+throwErrorContext
+    :: forall (m :: * -> *) b env expr err.
+    (MonadState env m, MonadError [ErrorContext env expr err] m)
+    => [expr]
+    -> err
+    -> m b
 throwErrorContext exprStack err = throwErrorContexts [(exprStack, err)]
 
 {-|
     Throw a list of errors in `ErrorContext`'s.
 -}
+throwErrorContexts
+    :: forall (m :: * -> *) b (f :: * -> *) env expr err.
+    (Functor f, MonadState env m, MonadError (f (ErrorContext env expr err)) m)
+    => f ([expr], err) ->
+    m b
 throwErrorContexts exprsAndErrs = do
     -- Get the current environment at the time of the errors.
     env <- get
@@ -79,6 +85,12 @@ throwErrorContexts exprsAndErrs = do
     If there have been any errors, add the given expression to the head of
     all the error contexts' expression stacks.
 -}
+appendExprToEContexts
+    :: forall (m :: * -> *) a (f :: * -> *) env err expr.
+    (Functor f, MonadError (f (ErrorContext env expr err)) m)
+    => expr
+    -> m a
+    -> m a
 appendExprToEContexts expr = flip catchError (throwError . fmap (expression %~ (expr :)))
 
 {-|
