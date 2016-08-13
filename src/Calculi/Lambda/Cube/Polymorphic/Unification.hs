@@ -13,6 +13,7 @@ module Calculi.Lambda.Cube.Polymorphic.Unification (
     , applyAllSubsGr
     , unvalidatedApplyAllSubs
     , resolveMutuals
+    , resolveMutualsAsPairs
     -- * Substitution validation
     -- ** Substitution error datatypes
     , SubsErr(..)
@@ -182,12 +183,31 @@ resolveMutualsNew subs =
             insMapNodesM (muts >>= (\(p1,p2) -> [p1, p2]))
             insMapEdgesM $ (\(p1, p2) -> (p1, p2, ())) <$> muts
 
+        mutualToReplaceTransform :: Gr p () -> Gr t p
+        mutualToReplaceTransform graph =
+            {- going to generate replacements towards all nodes that aren't
+               articulation points, then any articulation points that are
+               connected to eachother will have their incoming substitutions duplicated
+               like we had them done in the old algorithm.
+            -}
+            let artPoints = Graph.ap graph
+            in undefined
+
         {-
-            perform a transform on the
+            perform a transform on the graph that rearranges the substitutions
+            in such a way that nothing breaks.
         -}
         muts' :: [(t, p)]
-        muts' = undefined
+        muts' = topsortSubsG (mutualToReplaceTransform mutsGraph)
+
     in subs' ++ muts'
+
+resolveMutualsAsPairs :: forall t p. (Polymorphic t, p ~ PolyType t)
+                      => [Substitution t p]
+                      -> [(t, p)]
+resolveMutualsAsPairs []                    = []
+resolveMutualsAsPairs (Replace t p  : subs) = (t, p)                        : resolveMutualsAsPairs subs
+resolveMutualsAsPairs (Mutual p1 p2 : subs) = (poly p1, p2) : (poly p2, p1) : resolveMutualsAsPairs subs
 
 {-|
 
