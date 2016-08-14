@@ -48,28 +48,11 @@ The lambda cube describes the properties of a number of typesystems, an overview
 
 ***
 
-### Supported lambda-cube axies
-
-- [x] Simply-typed lambda calculus
-- [x] Polymorphic lambda calculus
-- [x] Higher-order lambda calculus
-- [x] Dependently-typed lambda calculus (dubiously, not got a implemented typesystem to back it up)
-
 ### TODOs
 
-- [ ] Give `Calculi.Lambda.Cube.Polymorphic.Unification` better documentation (incl. diagrams for graph-related functions/anything that'll benefit).
-- [ ] Finish the `Typecheckable` & `Inferable` instances for the typesystems in `Compiler.Typesystem.*`
-- [ ] Put together a working travis file.
-- [ ] Implement a Calculus of Constructions typesystem.
-- [ ] Document the type expression psudocode
-- [ ] Design a typeclass for typesystems with constraints (`Num a => ...`, `a ~ T` etc).
-- [ ] Provide a default way of evaluating lambda expressions.
-- [ ] Make the quasiquoters use the lambda cube typeclasses instead of specific typesystem implementations.
-- [ ] Subhask-style automated test writing.
-- [ ] Explore homotopy type theory
+- [ ] Explore homotopy type theory (massive undertaking, don't have the energy)
 - [ ] Remove all extensions that aren't light syntactic sugar from `default-extensions` and declare them explicitly in the modules they're used.
 - [ ] Listen to `-Wall`
-- [ ] Move `Control.Typecheckable` to it's own package.
 - [ ] Elaborate on the `Typecheck` type. Maybe make it a typeclass.
 
 ### Papers, Sites and Books read during development
