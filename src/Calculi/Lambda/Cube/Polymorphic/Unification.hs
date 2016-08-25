@@ -41,6 +41,7 @@ import           Data.Graph.Inductive.Helper
 import           Data.List.Ordered
 import           Data.List (group)
 import           Data.Maybe
+import           Data.Set                              (Set)
 import qualified Data.Set                       as Set
 import           Data.Tree
 
@@ -202,6 +203,32 @@ resolveMutualsNew subs =
 
     in subs' ++ muts'
 
+aliasSolverTransform :: forall gr t p. (DynGraph gr, Ord p)
+                     => gr p ()
+                     -> gr t p
+aliasSolverTransform graph =
+    let -- Get the articulation points and generate a set of them as well for
+        -- more efficent
+        artPoints = Graph.ap graph
+        artPointSet = Set.fromList artPoints
+        mergeAPTransform :: gr (Set p) ()
+        mergeAPTransform =  flip execState (nmap Set.singleton graph) $ do
+            -- ... transform the graph, I lost the notebook that explained how though ...
+            return ()
+
+        {-
+            Transform that rebuilds a graph of variables from a graph of
+            sets of variables.
+        -}
+        unsetTransform :: (Set p -> (Maybe p, Set p)) -> gr (Set p) () -> gr p ()
+        unsetTransform f gr = undefined . flip execState (nmap f gr) $ do
+            return ()
+
+    in undefined
+
+{-|
+    Temporary test resolver. Doesn't resolve aliases properly.
+-}
 resolveMutualsAsPairs :: forall t p. (Polymorphic t, p ~ PolyType t)
                       => [Substitution t p]
                       -> [(t, p)]
@@ -320,7 +347,7 @@ infix 4 \<
 topsortSubs :: forall gr t p. (DynGraph gr, Polymorphic t, p ~ PolyType t)
             => [(t, p)]
             -> Either [SubsErr gr t p] [(t, p)]
-topsortSubs = fmap topsortSubsG . (substitutionGraph :: [(t, p)] -> Either [SubsErr gr t p] (gr t p))
+topsortSubs = fmap topsortSubsG . substitutionGraph
 
 {-|
     A version of `topsortSubs` that takes an already generated graph rather than
