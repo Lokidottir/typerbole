@@ -1,8 +1,11 @@
 module Data.Graph.Inductive.Helper where
 
+import           Control.Monad.State
+import           Data.Bifunctor
 import           Data.Graph.Inductive as Graph
 import qualified Data.Map             as Map
 import           Data.Maybe
+import           Data.Semigroup
 import qualified Data.Set             as Set
 import qualified Data.Tree            as Tree
 import           Safe
@@ -124,3 +127,60 @@ unvalidatedEdgeyTopsort graph =
         Nothing                 -> []
         Just (Nothing, _)       -> []
         Just (Just ctx, graph') -> fmap (\(_, _, l) -> (lab' ctx, l)) (out' ctx) ++ unvalidatedEdgeyTopsort graph'
+
+{-|
+    Update the value for a node while retaining it's inward and outward edges,
+    because this isn't an existing FGL thing apparantly.
+-}
+updateNode :: forall gr n e. (DynGraph gr) => Node -> (n -> n) -> gr n e -> gr n e
+updateNode n f gr = flip execState gr $ do
+    n'valMaybe <- gets lab <*> pure n
+    -- Apply the update function to the node's value if it's there
+    case f <$> n'valMaybe of
+        -- If the node doesn't exist, then just return the graph as is
+        Nothing -> return ()
+        -- If the node does exist, update it's value
+        Just n'val -> do
+            -- get the inward and outward edges of the node
+            n'edges <- mappend <$> (gets inn <*> pure n) <*> (gets out <*> pure n)
+            -- delete them, and the node
+            modify (delEdges (toEdge <$> n'edges))
+            modify (delNode n)
+            -- add the node back with it's new value
+            modify (insNode (n, n'val))
+            -- and add it's edges back.
+            modify (insEdges n'edges)
+            -- My kingdom for better graph library.
+
+{-|
+    Merge the values and edges of two given nodes.
+-}
+mergeNodes :: (Semigroup n, DynGraph gr) => Node -> Node -> gr n e -> Maybe (gr n e)
+mergeNodes n1 n2 gr = mergeNodesBody <$> lab gr n1 where
+    mergeNodesBody n1'val = flip execState gr $ do
+        -- Get the (labeled) edges of n1
+        n1'edges <- mappend <$> (gets inn <*> pure n1) <*> (gets out <*> pure n1)
+        -- delete all the edges of n1
+        modify (delEdges (toEdge <$> n1'edges))
+        -- then delete n1
+        modify (delNode n1)
+        -- then merge the n1's value with n2's value
+        modify (updateNode n2 (<> n1'val))
+        -- then recreate all the edges of n1 but targeting or originating fron n2
+        modify (insEdges $ replaceNodeInLEdgeWith n1 n2 <$> n1'edges)
+
+mapNodeInEdge :: (Node -> Node) -> Edge -> Edge
+mapNodeInEdge f = bimap f f
+
+mapNodeInLEdge :: (Node -> Node) -> LEdge e -> LEdge e
+mapNodeInLEdge f (a, b, el) = (f a, f b, el)
+
+replaceNodeInEdgeWith :: Node -> Node -> Edge -> Edge
+replaceNodeInEdgeWith n1 n2 =
+    let replace n = if n == n1 then n2 else n
+    in mapNodeInEdge replace
+
+replaceNodeInLEdgeWith :: Node -> Node -> LEdge e -> LEdge e
+replaceNodeInLEdgeWith n1 n2 =
+    let replace n = if n == n1 then n2 else n
+    in mapNodeInLEdge replace
