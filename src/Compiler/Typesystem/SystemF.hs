@@ -63,19 +63,20 @@ deriving instance (Polymorphic t, Eq v, Eq c) => Eq (SystemFErr c v t)
 deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => Show (SystemFErr c v t)
 
 instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
-    show (Mono m) = show m
-    show (Poly p) =  show p
-    show (Function a b) =
-        let isForall (Forall _ _) = True
-            isForall _ = False
-            astr = if isFunction a || isForall a then "(" ++ show a ++ ")" else show a
-        in  astr ++ " -> " ++ show b
-    show (Forall p expr) =
-        let getQuant :: SystemF m p -> ([p], SystemF m p)
-            getQuant (Forall _p _expr) = getQuant _expr & _1 %~ (_p :)
-            getQuant _expr             = ([], _expr)
-            (ps, _expr) = getQuant expr
-        in "forall " ++ unwords (show <$> (p:ps)) ++ ". " ++ show _expr
+    show t = "[sf| " ++ show' t ++ " |]" where
+        show' (Mono m) = show m
+        show' (Poly p) =  show p
+        show' (Function a b) =
+            let isForall (Forall _ _) = True
+                isForall _ = False
+                astr = if isFunction a || isForall a then "(" ++ show' a ++ ")" else show' a
+            in  astr ++ " -> " ++ show' b
+        show' (Forall p expr) =
+            let getQuant :: SystemF m p -> ([p], SystemF m p)
+                getQuant (Forall _p _expr) = getQuant _expr & _1 %~ (_p :)
+                getQuant _expr             = ([], _expr)
+                (ps, _expr) = getQuant expr
+            in "forall " ++ unwords (show <$> (p:ps)) ++ ". " ++ show' _expr
 
 
 deriveBifunctor ''SystemF
