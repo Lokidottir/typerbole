@@ -65,19 +65,18 @@ deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => 
 instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
     show t = "[sf| " ++ show' t ++ " |]" where
         show' (Mono m) = show m
-        show' (Poly p) =  show p
+        show' (Poly p) = show p
         show' (Function a b) =
             let isForall (Forall _ _) = True
                 isForall _ = False
                 astr = if isFunction a || isForall a then "(" ++ show' a ++ ")" else show' a
             in  astr ++ " -> " ++ show' b
         show' (Forall p expr) =
-            let getQuant :: SystemF m p -> ([p], SystemF m p)
-                getQuant (Forall _p _expr) = getQuant _expr & _1 %~ (_p :)
-                getQuant _expr             = ([], _expr)
-                (ps, _expr) = getQuant expr
+            let getQuantified :: SystemF m p -> ([p], SystemF m p)
+                getQuantified (Forall _p _expr) = getQuantified _expr & _1 %~ (_p :)
+                getQuantified _expr             = ([], _expr)
+                (ps, _expr) = getQuantified expr
             in "forall " ++ unwords (show <$> (p:ps)) ++ ". " ++ show' _expr
-
 
 deriveBifunctor ''SystemF
 deriveBifoldable ''SystemF
