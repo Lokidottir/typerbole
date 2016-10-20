@@ -222,11 +222,27 @@ aliasSolverTransform termMap graph =
         {-
             Transform that rebuilds a graph of variables from a graph of
             sets of variables.
+
+            {A, B, C} becomes (A, {B, C}) which becomes (A) with two edges towards
+            the new nodes (B) and (C), while retaining all the edges that {A, B, C} had.
         -}
         unsetTransform :: (NonEmpty p -> (p, [p])) -> gr (NonEmpty p) () -> gr p ()
-        unsetTransform pick gr = nmap fst . Graph.run_ (nmap pick gr) $ do
-            --
-            return ()
+        unsetTransform pick gr = nmap fst . flip execState (nmap pick gr) $ do
+            lnodes <- gets labNodes
+            forM_ lnodes $ \(nn, (l, toConnect)) -> do
+                forM_ toConnect $ \p -> do
+                    -- Get an available node number for "p"
+                    p'nn <- nextNumber
+                    -- Insert the node for "p"
+                    modify $ insNode (p'nn, (p, []))
+                    -- Create the relevent edge
+                    modify $ insEdge (nn, p'nn, ())
+                -- We've connected all the nodes, so we replace the list of nodes
+                -- we needed to connect with an empty list.
+                modify $ updateNode nn (const (l, []))
+            return () where
+                -- Get the next available node number.
+                nextNumber = gets (head . newNodes 1)
 
         {-|
             Take the processed graph and perform a transform such that
