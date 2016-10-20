@@ -155,8 +155,8 @@ updateNode n f gr = flip execState gr $ do
 {-|
     Merge the values and edges of two given nodes.
 -}
-mergeNodes :: (Semigroup n, DynGraph gr) => Node -> Node -> gr n e -> Maybe (gr n e)
-mergeNodes n1 n2 gr = mergeNodesBody <$> lab gr n1 where
+mergeNodes :: (Semigroup n, DynGraph gr) => Node -> Node -> gr n e -> gr n e
+mergeNodes n1 n2 gr = fromMaybe gr $ mergeNodesBody <$> lab gr n1 where
     mergeNodesBody n1'val = flip execState gr $ do
         -- Get the (labeled) edges of n1
         n1'edges <- mappend <$> (gets inn <*> pure n1) <*> (gets out <*> pure n1)

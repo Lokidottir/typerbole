@@ -39,6 +39,8 @@ import           Data.Either (partitionEithers)
 import           Data.Graph.Inductive as Graph hiding ((&))
 import           Data.Graph.Inductive.Helper
 import           Data.List.Ordered
+import           Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.List (group)
 import           Data.Maybe
 import           Data.Set                              (Set)
@@ -204,15 +206,16 @@ resolveMutualsNew subs =
     in subs' ++ muts'
 
 aliasSolverTransform :: forall gr t p. (DynGraph gr, Ord p)
-                     => gr p ()
+                     => (p -> t)
+                     -> gr p ()
                      -> gr t p
-aliasSolverTransform graph =
+aliasSolverTransform termMap graph =
     let -- Get the articulation points and generate a set of them as well for
-        -- more efficent
+        -- more efficent checking of if a node is an AP.
         artPoints = Graph.ap graph
         artPointSet = Set.fromList artPoints
-        mergeAPTransform :: gr (Set p) ()
-        mergeAPTransform =  flip execState (nmap Set.singleton graph) $ do
+        mergeAPTransform :: gr p () -> gr (NonEmpty p) ()
+        mergeAPTransform gr = flip execState (nmap pure gr) $ do
             -- ... transform the graph, I lost the notebook that explained how though ...
             return ()
 
@@ -220,11 +223,34 @@ aliasSolverTransform graph =
             Transform that rebuilds a graph of variables from a graph of
             sets of variables.
         -}
-        unsetTransform :: (Set p -> (Maybe p, Set p)) -> gr (Set p) () -> gr p ()
-        unsetTransform f gr = undefined . flip execState (nmap f gr) $ do
+        unsetTransform :: (NonEmpty p -> (p, [p])) -> gr (NonEmpty p) () -> gr p ()
+        unsetTransform pick gr = nmap fst . Graph.run_ (nmap pick gr) $ do
+            --
             return ()
 
-    in undefined
+        {-|
+            Take the processed graph and perform a transform such that
+            every unlabeled edge `N -( )-> M` becomes `N -(M)-> M`
+            which notates that N replaces M in the node M.
+        -}
+        relabelTransform :: gr p () -> gr p p
+        relabelTransform gr =
+            let -- | The nodes.
+                lnodes = snd <$> labNodes gr
+                -- | The new edges
+                ledges = (\(fr, t) -> (fr, t, t))
+                       . bimap (fromJust . lab gr) (fromJust . lab gr) <$> edges gr
+            in Graph.run_ empty $ do
+                -- insert the nodes again.
+                insMapNodesM lnodes
+                -- insert the edges with their new labels.
+                insMapEdgesM ledges
+
+
+    in nmap termMap
+     . relabelTransform
+     . unsetTransform (fmap (maybe [] NonEmpty.toList) . NonEmpty.uncons)
+     . mergeAPTransform $ graph
 
 {-|
     Temporary test resolver. Doesn't resolve aliases properly.
