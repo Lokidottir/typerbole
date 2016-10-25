@@ -136,7 +136,7 @@ unify :: forall gr t p. (Polymorphic t, p ~ PolyType t, DynGraph gr)
       -> Either [SubsErr gr t p] [(t, p)] -- ^ The result from trying to unify both type expressions.
 unify t1 t2 = do
     -- Find the substitutions and partition them into mutuals and substitutions
-    subs <- resolveMutuals <$> substitutionsM t1 t2
+    subs <- resolveMutualsNew <$> substitutionsM t1 t2
     -- validate and order the substitutions
     topsortSubsG <$> substitutionGraph subs
 
@@ -183,41 +183,65 @@ resolveMutualsNew subs =
         -}
         mutsGraph :: Gr p ()
         mutsGraph = run_ empty $ do
-            insMapNodesM (muts >>= (\(p1,p2) -> [p1, p2]))
-            insMapEdgesM $ (\(p1, p2) -> (p1, p2, ())) <$> muts
+            insMapNodesM (nubSort $ muts >>= (\(p1,p2) -> [p1, p2]))
+            insMapEdgesM $ (\(p1, p2) -> [(p1, p2, ()), (p2, p1, ())]) =<< muts
 
-        mutualToReplaceTransform :: Gr p () -> Gr t p
-        mutualToReplaceTransform graph =
-            {- going to generate replacements towards all nodes that aren't
-               articulation points, then any articulation points that are
-               connected to eachother will have their incoming substitutions duplicated
-               like we had them done in the old algorithm.
-            -}
-            let artPoints = Graph.ap graph
-            in undefined
+        mutualToReplaceTransform :: Gr p () -> Gr p p
+        mutualToReplaceTransform = aliasSolverTransform
 
         {-
             perform a transform on the graph that rearranges the substitutions
             in such a way that nothing breaks.
         -}
-        muts' :: [(t, p)]
+        muts' :: [(p, p)]
         muts' = topsortSubsG (mutualToReplaceTransform mutsGraph)
 
-    in subs' ++ muts'
+        muts'termed :: [(t, p)]
+        muts'termed = (first poly <$> muts')
 
-aliasSolverTransform :: forall gr t p. (DynGraph gr, Ord p)
-                     => (p -> t)
-                     -> gr p ()
-                     -> gr t p
-aliasSolverTransform termMap graph =
+        applySubs = foldr ((.) . uncurry applySubstitution) id muts'termed
+
+        applySubsPoly = foldr ((.) . uncurry subsPoly) id muts'
+
+        subsPoly sub target p | p == target = sub
+                              | otherwise   = target
+
+    in (bimap applySubs applySubsPoly <$> subs') ++ muts'termed
+
+testUnify :: forall t. (Polymorphic t) => t -> t -> Either [SubsErr Gr t (PolyType t)] (t -> t)
+testUnify a b = applyAllSubsGr =<< unifyGr a b
+
+aliasSolverTransform :: forall gr p. (DynGraph gr, Ord p)
+                     => gr p ()
+                     -> gr p p
+aliasSolverTransform graph =
     let -- Get the articulation points and generate a set of them as well for
         -- more efficent checking of if a node is an AP.
         artPoints = Graph.ap graph
         artPointSet = Set.fromList artPoints
+
+        -- | Groups of ajacent articulation points.
+        artPointGroups :: [Set.Set Node]
+        artPointGroups = undefined
+
         mergeAPTransform :: gr p () -> gr (NonEmpty p) ()
         mergeAPTransform gr = flip execState (nmap pure gr) $ do
-            -- ... transform the graph, I lost the notebook that explained how though ...
+
             return ()
+
+        -- | Merge all subgroups, this is not intended to be a solution
+        -- but a means to get things done while working out alternatives.
+        adHocMergeTransform :: gr p () -> gr (NonEmpty p) ()
+        adHocMergeTransform gr = getRidOfLoops . flip execState (nmap pure gr) $ do
+            groups <- gets scc
+            forM_ groups $ \case
+                []     -> return ()
+                (x:xs) -> forM_ xs (modify . mergeNodes x)
+
+        getRidOfLoops :: forall n e. gr n e -> gr n e
+        getRidOfLoops gr = flip execState gr $ do
+            ns <- gets nodes
+            forM_ ns $ \node -> modify $ delEdge (node, node)
 
         {-
             Transform that rebuilds a graph of variables from a graph of
@@ -263,10 +287,10 @@ aliasSolverTransform termMap graph =
                 insMapEdgesM ledges
 
 
-    in nmap termMap
-     . relabelTransform
+    in relabelTransform
      . unsetTransform (fmap (maybe [] NonEmpty.toList) . NonEmpty.uncons)
-     . mergeAPTransform $ graph
+     -- TODO: have it be: ". mergeAPTransform $ graph"
+     . adHocMergeTransform $ graph
 
 {-|
     Temporary test resolver. Doesn't resolve aliases properly.
