@@ -2,13 +2,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
 module Compiler.Typesystem.SystemF where
 
 import           Data.Bifunctor.TH
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Calculi.Lambda.Cube.Polymorphic
-import           Calculi.Lambda.Cube.Polymorphic.Unification
 import           Control.Typecheckable
 import           Control.Monad
 import           Control.Monad.State
@@ -42,6 +43,17 @@ data SystemF m p =
       -- ^ Universal quantifier, the @forall@ in @forall a. a@
     deriving (Eq, Ord, Data)
 
+data Quant = Expr | Quantify deriving (Eq, Ord, Show, Read)
+
+{-|
+    First order logic System F representation.
+-}
+data SFGADT (q :: Quant) m p where
+    SFMono :: m -> SFGADT 'Expr m p
+    SFPoly :: p -> SFGADT 'Expr m p
+    SFFunction :: SFGADT 'Expr m p -> SFGADT 'Expr m p -> SFGADT 'Expr m p
+    SFForall :: [p] -> SFGADT q m p -> SFGADT 'Quantify m p
+
 data SystemFContext c v t p = SystemFContext {
       _polyctx :: SubsContext t p
       -- ^ The context for Polymorphic related information
@@ -51,6 +63,7 @@ data SystemFContext c v t p = SystemFContext {
 
 makeLenses ''SystemFContext
 
+{-
 {-|
     Error sum not within Eithers because those (GHC) type errors are messy.
 -}
@@ -59,9 +72,10 @@ data SystemFErr c v t =
     | SFSimpleTypeErr (SimpleTypeErr t)
     | SFSubsErr (SubsErr Gr t (PolyType t))
 
+
 deriving instance (Polymorphic t, Eq v, Eq c) => Eq (SystemFErr c v t)
 deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => Show (SystemFErr c v t)
-
+-}
 instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
     show t = "[sf| " ++ show' t ++ " |]" where
         show' (Mono m) = show m
@@ -142,7 +156,7 @@ instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
         p@Poly{} -> Set.singleton p
         Function from to -> polytypesOf from <> polytypesOf to
         Forall _ expr -> polytypesOf expr
-
+{-
 instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF m p) where
 
     type TypingContext (LambdaTerm c v) (SystemF m p) = (SystemFContext c v (SystemF m p) p)
@@ -221,7 +235,7 @@ instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF
 
         outmostDeclaredPolys (Forall p texpr) = Set.insert (poly p) (outmostDeclaredPolys texpr)
         outmostDeclaredPolys _ = Set.empty
-
+-}
 instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
     arbitrary = process <$> sized (generatorSRWith aliases) where
