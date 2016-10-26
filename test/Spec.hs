@@ -59,6 +59,32 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
         (typeOrderingRule :: t -> Bool)
     prop "lifts up quantification during abstraction"
         (liftQuantifiersRule :: t -> PolyType t -> Bool)
+    prop "Unification rule 1: U(a, b) = V; V(a) ==== V(b)" $
+        forAll unifies (uncurry unificationR1)
+    prop "Unification rule 2: equivalent type expressions" $
+        forAll (uncurry equivalent) (uncurry unificationR1)
+    prop "result of 'unify' is commutative" $
+        forAll unifies (uncurry unificationCommutative)
+
+    where
+        unifies :: (t, t) -> Bool
+        unifies = (isRight . uncurry unify)
+
+        unificationEquiv :: t -> t -> Bool
+        unificationEquiv a b = fromRight False $ do
+            u <- unify a b
+            return (a ==== b && u a ==== b && u b ==== a)
+
+        unificationR1 :: t -> t -> Bool
+        unificationR1 a b = fromRight False $ do
+            u <- unify a b
+            return (u a ==== u b)
+
+        unificationCommutative :: t -> t -> Bool
+        unificationCommutative a b = fromRight False $ do
+            u1 <- unify a b
+            u2 <- unify b a
+            return (u1 a ==== u2 b && u2 a ==== u1 b && u1 a ==== u1 b)
 
 followsHigherOrder :: forall t. (Show t, HigherOrder t, Arbitrary t) => Gen t -> Spec
 followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
