@@ -68,7 +68,7 @@ followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
 
     where
         unifies :: (t, t) -> Bool
-        unifies = (isRight . uncurry unify)
+        unifies (a, b) = not (a ==== b) && isRight (unify a b)
 
         unificationEquiv :: t -> t -> Bool
         unificationEquiv a b = fromRight False $ do

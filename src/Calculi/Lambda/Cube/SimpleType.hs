@@ -87,36 +87,6 @@ class (Ord t) => SimpleType t where
     abstract :: t -> t -> t
 
     {-|
-        Given a function type, decompose it into it's argument and return types. Effectively
-        the inverse of `abstract` but returns `Nothing` when the type isn't a function type.
-
-        @`reify` (K → D) = Just (K, D) @
-
-        @`reify` (K) = Nothing@
-
-        When polymorphism is present:
-
-        @`reify` (∀ a. a → T) = Just (∀ a. a, t)@
-
-        @`reify` (a → T) = Just (a, t)@
-
-        `reify` is almost the inverse of `abstract`, and the following property should hold true:
-
-        prop> fmap (uncurry abstract) (reify t) = Just t
-
-    -}
-    reify :: t -> Maybe (t, t)
-
-    {-|
-        Given a type, return a set of all the base types that occur within the type.
-
-        @`bases` (∀ a. a) = Set.singleton (a)@
-
-        @`bases` (M X → (X → Z) → M Z) = Set.fromList [M, X, Z] -- or Set.fromList [M, X, Z, →], depending@
-    -}
-    bases :: t -> Set.Set t
-
-    {-|
         Polymorphic constructor synonym, as many implementations will have a constructor along
         the lines of "Mono m".
     -}
@@ -128,6 +98,38 @@ class (Ord t) => SimpleType t where
         type expressions to normal form before performing another equivalence check.
     -}
     equivalent :: t -> t -> Bool
+
+class SimpleType t => SimplyTypedUtil t where
+
+    {-|
+        Given a type, return a set of all the base types that occur within the type.
+
+        @`bases` (∀ a. a) = Set.singleton (a)@
+
+        @`bases` (M X → (X → Z) → M Z) = Set.fromList [M, X, Z] -- or Set.fromList [M, X, Z, →], depending@
+    -}
+    bases :: t -> Set.Set t
+
+    {-|
+        Given a function type, decompose it into it's argument and return types. Effectively
+        the inverse of `abstract` but returns `Nothing` when the type isn't a function type.
+
+        @`unabstract` (K → D) = Just (K, D) @
+
+        @`unabstract` (K) = Nothing@
+
+        When polymorphism is present:
+
+        @`unabstract` (∀ a. a → T) = Just (∀ a. a, t)@
+
+        @`unabstract` (a → T) = Just (a, t)@
+
+        `unabstract` is almost the inverse of `abstract`, and the following property should hold true:
+
+        prop> fmap (uncurry abstract) (unabstract t) = Just t
+
+    -}
+    unabstract :: t -> Maybe (t, t)
 
 {-|
     Infix `equivalent`.
@@ -157,8 +159,8 @@ infixr 7 /->
 
     @`order` X = 0@
 -}
-order :: SimpleType t => t -> Integer
-order t = case reify t of
+order :: SimplyTypedUtil t => t -> Integer
+order t = case unabstract t of
     Nothing -> 0
     Just (t1, t2) -> max (1 + order t1) (order t2)
 
@@ -166,9 +168,9 @@ order t = case reify t of
     given a function that prettyprints base types, pretty print the type with function arrows
     whenever a function type is present.
 -}
-prettyprintST :: SimpleType t => (t -> String) -> t -> String
+prettyprintST :: SimplyTypedUtil t => (t -> String) -> t -> String
 prettyprintST f t =
-    case reify t of
+    case unabstract t of
         Nothing -> f t
         Just (t1, t2) ->
             let t1'str = if isFunction t1 then "(" ++ prettyprintST f t1 ++ ")" else prettyprintST f t1
@@ -177,24 +179,24 @@ prettyprintST f t =
 {-|
     Check if a simple type is a function type.
 -}
-isFunction :: SimpleType t => t -> Bool
-isFunction = isJust . reify
+isFunction :: SimplyTypedUtil t => t -> Bool
+isFunction = isJust . unabstract
 
 {-|
     Check if a simple type is a base type.
 -}
-isBase :: SimpleType t => t -> Bool
+isBase :: SimplyTypedUtil t => t -> Bool
 isBase = not . isFunction
 
 {-|
     Function retrives a set of all base types in the given lambda expression.
 -}
-basesOfExpr :: SimpleType t => LambdaTerm c v t -> Set.Set t
+basesOfExpr :: SimplyTypedUtil t => LambdaTerm c v t -> Set.Set t
 basesOfExpr = bifoldr (\_ st -> st) (\t st -> bases t <> st) Set.empty
 
 {-|
     Get a typing environment that assumes all the base types in an expression
     are valid.
 -}
-envFromExpr :: SimpleType t => LambdaTerm c v t -> SimpleTypingContext c v t
+envFromExpr :: SimplyTypedUtil t => LambdaTerm c v t -> SimpleTypingContext c v t
 envFromExpr = SimpleTypingContext Map.empty Map.empty . basesOfExpr
