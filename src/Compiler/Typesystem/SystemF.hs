@@ -54,15 +54,6 @@ data SFGADT (q :: Quant) m p where
     SFFunction :: SFGADT 'Expr m p -> SFGADT 'Expr m p -> SFGADT 'Expr m p
     SFForall :: [p] -> SFGADT q m p -> SFGADT 'Quantify m p
 
-data SystemFContext c v t p = SystemFContext {
-      _polyctx :: SubsContext t p
-      -- ^ The context for Polymorphic related information
-    , _stlcctx :: SimpleTypingContext c v t
-      -- ^ The context for Simply-typed related information.
-} deriving (Eq, Ord, Show)
-
-makeLenses ''SystemFContext
-
 {-
 {-|
     Error sum not within Eithers because those (GHC) type errors are messy.
@@ -103,59 +94,29 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     abstract a b = systemFRaiseQuantifiers $ Function a b
 
-    reify (Function a b) = Just (a, b)
-    reify _              = Nothing
+    mono = Mono
+
+    equivalent = undefined -- areAlphaEquivalent
+
+instance (Ord m, Ord p) => SimplyTypedUtil (SystemF m p) where
+    unabstract (Function a b) = Just (a, b)
+    unabstract _              = Nothing
 
     bases = \case
         Function fun arg -> bases fun <> bases arg
         Forall p expr    -> Set.insert (Poly p) (bases expr)
         expr             -> Set.singleton expr
 
-    mono = Mono
-
-    equivalent = areAlphaEquivalent
-
 instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
+
+    type UnifyError (SystemF m p) = ()
+
+    unify = undefined
 
     type PolyType (SystemF m p) = p
 
-    substitutions = curry $ \case
-            (Forall _ expr1    , expr2)              -> substitutions expr1 expr2
-            (expr1             , Forall _ expr2)     -> substitutions expr1 expr2
-            (Poly p1           , Poly p2)            -> Right [Mutual p1 p2]
-            (expr              , Poly p)             -> Right [Replace expr p]
-            (Poly p            , expr)               -> Right [Replace expr p]
-            (Function arg1 ret1, Function arg2 ret2) -> substitutions arg1 arg2 <><> substitutions ret1 ret2
-            (expr1             , expr2)
-                | expr1 == expr2 -> Right []
-                | otherwise      -> Left [(expr1, expr2)]
-
-    applySubstitution sub target = applySubstitution' where
-        applySubstitution' = \case
-            m@Mono{}           -> m
-            p'@(Poly p)
-                | p == target  -> sub
-                | otherwise    -> p'
-            Forall p expr
-                | p == target  -> applySubstitution' expr
-                | otherwise    -> Forall p (applySubstitution' expr)
-            Function from to -> Function (applySubstitution' from) (applySubstitution' to)
-
-    quantify = Forall
-
     poly = Poly
 
-    quantifiedOf = \case
-        Mono _ -> Set.empty
-        Poly _ -> Set.empty
-        Function from to -> quantifiedOf from <> quantifiedOf to
-        Forall p texpr -> Set.insert (poly p) (quantifiedOf texpr)
-
-    polytypesOf = \case
-        Mono _ -> Set.empty
-        p@Poly{} -> Set.singleton p
-        Function from to -> polytypesOf from <> polytypesOf to
-        Forall _ expr -> polytypesOf expr
 {-
 instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF m p) where
 
@@ -196,7 +157,7 @@ instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF
                     fun'type <- typecheck' fun
                     arg'type <- typecheck' arg
                     -- Split fun'type into it's components
-                    (fun'from, fun'to) <- case reify fun'type of
+                    (fun'from, fun'to) <- case unabstract fun'type of
                         -- fun'type wasn't a function type, throw an error.
                         Nothing -> throwErrorContext [fun] (SFSimpleTypeErr (NotAFunction fun'type))
                         -- return the result
@@ -248,7 +209,7 @@ instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (
         {-
             Remove all generated quantifications and then generalise the expression's poly types.
         -}
-        process = generalise' . systemFMassUnquantify
+        process = systemFMassUnquantify
 
 {-|
     Internal function, makes sure all universal quantifiers appear at the \"top\" of
@@ -272,8 +233,7 @@ instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (
         [sf| forall a b. a -> b |]
 -}
 systemFRaiseQuantifiers :: (Ord m, Ord p) => SystemF m p -> SystemF m p
-systemFRaiseQuantifiers t =
-    foldr (\case (Poly p) -> quantify p; _ -> error "tried to raise a non-polytype") (systemFMassUnquantify t) (quantifiedOf t)
+systemFRaiseQuantifiers = systemFMassUnquantify
 
 {-|
     Remove all quantifications from a SystemF expression.

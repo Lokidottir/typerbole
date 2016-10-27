@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube
 import           Calculi.Lambda.Cube.Polymorphic
@@ -28,21 +29,19 @@ main = hspec $ do
         describe "System-F" $ do
             followsSimpleType (arbitrary :: Gen SystemF')
             followsPolymorphic (arbitrary :: Gen SystemF')
-        describe "System-Fω" $ do
-            followsSimpleType (arbitrary :: Gen SystemFOmega')
-            followsPolymorphic (arbitrary :: Gen SystemFOmega')
+--         describe "System-Fω" $ do
+--             followsSimpleType (arbitrary :: Gen SystemFOmega')
+--             followsPolymorphic (arbitrary :: Gen SystemFOmega')
             -- followsHigherOrder (arbitrary :: Gen SystemFOmega')
-
-    unificationRules (arbitrary :: Gen SystemF')
 
 type SimplyTyped' = SimplyTyped AlphabetUpper
 type SystemFOmega' = SystemFOmega AlphabetUpper AlphabetLow (Maybe (SimplyTyped AlphabetUpper))
 type SystemF' = SF.SystemF AlphabetUpper AlphabetLow
 
-followsSimpleType :: forall t. (SimpleType t, Show t, Arbitrary t) => Gen t -> Spec
+followsSimpleType :: forall t. (SimplyTypedUtil t, Show t, Arbitrary t) => Gen t -> Spec
 followsSimpleType gen = describe "SimpleType laws and properties" $ do
     prop "equivalence is reflexive" $ ((\ !ty -> ty ==== ty) :: t -> Bool)
-    prop "follows abstract-reify inverse law" $ (abstractInverse :: t -> t -> Bool)
+    prop "follows abstract-unabstract inverse law" $ (abstractInverse :: t -> t -> Bool)
 
 followsPolymorphic :: forall t.
                       (
@@ -55,16 +54,12 @@ followsPolymorphic :: forall t.
                       )
                    => Gen t -> Spec
 followsPolymorphic gen = describe "Polymorphic laws and properties" $ do
-    prop "follows type-ordering rule ((forall a. a) ⊑ _ = True)"
-        (typeOrderingRule :: t -> Bool)
-    prop "lifts up quantification during abstraction"
-        (liftQuantifiersRule :: t -> PolyType t -> Bool)
     prop "Unification rule 1: U(a, b) = V; V(a) ==== V(b)" $
-        forAll unifies (uncurry unificationR1)
+        forAll (arbitrary `suchThat` unifies) (uncurry unificationR1)
     prop "Unification rule 2: equivalent type expressions" $
-        forAll (uncurry equivalent) (uncurry unificationR1)
+        forAll (arbitrary `suchThat` uncurry equivalent) (uncurry unificationR1)
     prop "result of 'unify' is commutative" $
-        forAll unifies (uncurry unificationCommutative)
+        forAll (arbitrary `suchThat` unifies) (uncurry unificationCommutative)
 
     where
         unifies :: (t, t) -> Bool
@@ -91,23 +86,14 @@ followsHigherOrder gen = describe "HigherOrder laws and properties" $ do
     prop "follows typeap-untypeap inverse law" $ (typeapInverse ::  t -> t -> Bool)
 
 {-|
-    Check that `reify` is the inverse (within a Maybe) of `abstract` (with respect to `equivalent`).
+    Check that `unabstract` is the inverse (within a Maybe) of `abstract` (with respect to `equivalent`).
 -}
-abstractInverse :: (SimpleType t) => t -> t -> Bool
+abstractInverse :: (SimplyTypedUtil t) => t -> t -> Bool
 abstractInverse !ta !tb =
-    fromMaybe False $ reify (ta /-> tb) >>= (\(ta', tb') -> return (ta ==== ta' && tb ==== tb'))
+    fromMaybe False $ unabstract (ta /-> tb) >>= (\(ta', tb') -> return (ta ==== ta' && tb ==== tb'))
 
 typeapInverse :: HigherOrder t => t -> t -> Bool
 typeapInverse !ta !tb = fmap (uncurry (/$)) (untypeap (ta /$ tb)) == Just (ta /$ tb)
-
-typeOrderingRule :: (Enum e, Polymorphic t, PolyType t ~ e) => t -> Bool
-typeOrderingRule !t = poly (toEnum 9999) ⊑ t
-
-{-
-    Assert that `abstract` lifts all of the quantifiers to the result.
--}
-liftQuantifiersRule :: (Polymorphic t, PolyType t ~ p) => t -> p -> Bool
-liftQuantifiersRule t p = t /-> quantify p (poly p) ==== quantify p (t /-> poly p)
 
 disjoint a b = Set.intersection a b == Set.empty
 

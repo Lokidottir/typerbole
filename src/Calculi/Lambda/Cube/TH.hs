@@ -75,24 +75,6 @@ constant :: LCParsec String
 constant = lamctoken ((:) <$> upperChar <*> many (lowerChar <|> upperChar)) <?> "constant"
 
 {-|
-    Given a type expression parser for a Polymorphic typesystem, parse a forall
-    quantification (@∀ a b c. <expr>@ or @forall a b c. <expr>@) followed by
-    the expression parser that was passed to it.
--}
-quant :: (Polymorphic t, String ~ PolyType t) => LCParsec t -> LCParsec t
-quant pexpr = label "quantification" $ do
-    -- Parse the prefix for quantification
-    void $ lamcsymbol "∀" <|> lamcsymbol "forall"
-    -- Parse one or more variables
-    tvars <- some variable
-    -- terminate the quantification expression with a period
-    void $ lamcsymbol "."
-    -- parse the expression with the parser passed to this function
-    expr <- pexpr
-    -- quantify each variable over the expression that was passed.
-    return (foldr quantify expr tvars)
-
-{-|
     given a subexpression parser, parse a sequence of subexpressions
     seperated by function arrows.
 -}
@@ -118,8 +100,7 @@ sfoexpr = label "System-Fω expression" $
 -}
 sfexpr :: LCParsec StringSF
 sfexpr = label "System-F expression" $
-          quant sfexpr
-      <|> exprsequence (poly <$> variable
+          exprsequence (poly <$> variable
                     <|> mono <$> constant
                     <|> paren sfexpr)
 

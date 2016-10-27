@@ -5,6 +5,7 @@
 module Calculi.Lambda.Cube.SimpleType (
     -- * Typeclass for λ→
       SimpleType(..)
+    , SimplyTypedUtil(..)
     -- ** Notation and related functions
     , (====)
     , (/->)

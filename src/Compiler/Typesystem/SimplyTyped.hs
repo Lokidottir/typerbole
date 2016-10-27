@@ -41,15 +41,17 @@ instance Ord m => SimpleType (SimplyTyped m) where
 
     abstract = Function
 
-    reify (Function from to) = Just (from, to)
-    reify _                  = Nothing
-
-    bases (Mono m)           = Set.singleton (Mono m)
-    bases (Function from to) = bases from `Set.union` bases to
-
     mono = Mono
 
     equivalent = (==)
+
+instance Ord m => SimplyTypedUtil (SimplyTyped m) where
+
+    unabstract (Function from to) = Just (from, to)
+    unabstract _                  = Nothing
+
+    bases (Mono m)           = Set.singleton (Mono m)
+    bases (Function from to) = bases from `Set.union` bases to
 
 data SimplyTypedErr c v t =
       STNotKnownErr (NotKnownErr c v t)
@@ -95,7 +97,7 @@ instance (Ord m, Ord c, Ord v) => Typecheckable (LambdaTerm c v) (SimplyTyped m)
                         -- discard their contexts
                         (_, fun'type) <- fun'
                         (_, arg'type) <- arg'
-                        case reify fun'type of
+                        case unabstract fun'type of
                             Nothing       ->
                                 -- The first expression's type wasn't a function type.
                                 Left [ErrorContext [fun] env (STSimpleTypeErr $ NotAFunction fun'type)]
