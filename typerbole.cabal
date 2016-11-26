@@ -1,5 +1,5 @@
 name:                typerbole
-version:             0.0.0.6
+version:             1.0.0.0
 synopsis:            A typesystems library with exaggerated claims
 description:         Please see README.md
 license:             BSD3
@@ -50,7 +50,7 @@ library
                      , QuickCheck
                      , syb
                      , mtl
-                     , generic-random == 0.1.1.0
+                     , generic-random == 0.3.0.0
                      , lens
                      , template-haskell
                      , th-lift

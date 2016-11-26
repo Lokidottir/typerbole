@@ -10,7 +10,7 @@ import qualified Control.Monad.State            as State
 import           Data.Bifunctor
 import           Data.Generics
 import qualified Data.Map                       as Map
-import           Data.Random.Generics
+import           Generic.Random.Data
 import           Data.Semigroup
 import qualified Data.Set                       as Set
 import           Test.QuickCheck

@@ -20,7 +20,7 @@ import           Compiler.Typesystem.SimplyTyped (SimplyTyped)
 import qualified Language.Haskell.TH.Lift as TH
 import           Data.Bifunctor.TH
 import           Data.Generics
-import           Data.Random.Generics
+import           Generic.Random.Data
 import           Data.Semigroup
 import qualified Data.Set                        as Set
 import           Test.QuickCheck

@@ -20,7 +20,7 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import           Data.Traversable
 import           Data.List
-import           Data.Random.Generics
+import           Generic.Random.Data
 import           Data.Generics
 import           Data.Semigroup
 import           Data.Maybe

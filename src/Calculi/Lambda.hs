@@ -22,7 +22,7 @@ import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper
 import qualified Data.Map                    as Map
 import           Data.Maybe
-import           Data.Random.Generics
+import           Generic.Random.Data
 import           Data.Semigroup
 import qualified Data.Set                    as Set
 import           Test.QuickCheck
