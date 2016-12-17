@@ -77,7 +77,7 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     typeconst = Mono
 
-    equivalent = undefined -- areAlphaEquivalent
+    equivalent = Unify.areAlphaEquivalent
 
 instance (Ord m, Ord p) => SimplyTypedUtil (SystemF m p) where
     unabstract (Function a b) = Just (a, b)
