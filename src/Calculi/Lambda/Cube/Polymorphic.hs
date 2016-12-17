@@ -9,12 +9,19 @@ import           Calculi.Lambda.Cube.SimpleType
 {-|
     Class of typesystems that exhibit polymorphism.
 -}
-class (Ord (PolyType t), SimpleType t) => Polymorphic t where
+class (Ord (TypeVariable t), SimpleType t) => Polymorphic t where
 
     {-|
         The type that reports any possible errors that occur during unification.
     -}
     type UnifyError t :: *
+
+    {-|
+        The context for unification, in many typesystems this may be `()` but in others
+        it might be information on the kinds of constants or background knowledge related
+        to rewriting terms.
+    -}
+    type UnifyContext t :: *
 
     {-|
         Unify two given type expressions.
@@ -60,15 +67,14 @@ class (Ord (PolyType t), SimpleType t) => Polymorphic t where
             -- Additionally: "u a", "u b", "a", and "b" are all equivalent to eachother.
             @
     -}
-    unify :: t -> t -> Either (UnifyError t) (t -> t)
+    unify :: UnifyContext t -> t -> t -> (UnifyContext t, Either [UnifyError t] (t -> t))
 
     {-|
-        The representation of a poly type, also reffered to as a type variable.
+        The representation of a type variable.
     -}
-    type PolyType t :: *
+    type TypeVariable t :: *
 
     {-|
-        Polymorphic constructor synonym, as many implementations will have a constructor along
-        the lines of "Poly p".
+        Constructor synonym for type variables.
     -}
-    poly :: PolyType t -> t
+    typevar :: TypeVariable t -> t

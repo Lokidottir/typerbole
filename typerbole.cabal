@@ -56,9 +56,10 @@ library
                      , th-lift
                      , megaparsec
                      , safe
-  ghc-options:         -Wall
-                       -fno-warn-type-defaults
-                       -fno-warn-unused-do-bind
+                     , unify-terms
+  -- ghc-options:         -Wall
+  --                      -fno-warn-type-defaults
+  --                      -fno-warn-unused-do-bind
   default-language:    Haskell2010
   default-extensions:  ScopedTypeVariables
                      , LambdaCase

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-|
     Module describing a typeclass for types with stronger mathematical foundations that
     represents a type system for simply-typed lambda calculus (λ→ on the lambda cube).
@@ -64,14 +65,14 @@ makeLenses ''SimpleTypingContext
     Typeclass based off simply-typed lambda calculus + a method for getting all
     the base types in a type.
 -}
-class (Ord t) => SimpleType t where
+class (Ord t, Ord (TypeConstant t)) => SimpleType t where
     {-|
         The representation of a Mono type, also sometimes referred to a type constant.
 
         in the type expression @A → M@, both @A@ and @M@ are mono types, but in a polymorphic
         type expression such as @∀ a. a → X@, @a@ is not a mono type.
     -}
-    type MonoType t :: *
+    type TypeConstant t :: *
 
     {-|
         Given two types, generate a new type representing the type of a function from
@@ -91,7 +92,7 @@ class (Ord t) => SimpleType t where
         Polymorphic constructor synonym, as many implementations will have a constructor along
         the lines of "Mono m".
     -}
-    mono :: MonoType t -> t
+    typeconst :: TypeConstant t -> t
 
     {-|
         Type equivalence, for simple typesystems this might be `(==)` but for polymorphic or

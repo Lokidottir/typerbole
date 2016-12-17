@@ -16,6 +16,7 @@ import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Lens hiding (elements, from, to)
 import           Data.Either.Combinators
+import           Data.Either.Validation as Val
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import           Data.Traversable
@@ -26,6 +27,7 @@ import           Data.Semigroup
 import           Data.Maybe
 import           Data.Graph.Inductive (Gr)
 import           Test.QuickCheck
+import qualified Term.Unify as Unify
 import qualified Language.Haskell.TH.Lift as TH
 
 {-|
@@ -36,23 +38,10 @@ data SystemF m p =
       Mono m
       -- ^ Mono types/type constants, i.e. @Int@ or @String@
     | Poly p
-      -- ^ Poly types/type variables, i. e. the @a@ in @forall a. a -> Int@
+      -- ^ Poly types/type variables, i. e. the @a@ a -> Int@
     | Function (SystemF m p) (SystemF m p)
       -- ^ Function type constructor, i e. @->@ in @a -> b@
-    | Forall p (SystemF m p)
-      -- ^ Universal quantifier, the @forall@ in @forall a. a@
     deriving (Eq, Ord, Data)
-
-data Quant = Expr | Quantify deriving (Eq, Ord, Show, Read)
-
-{-|
-    First order logic System F representation.
--}
-data SFGADT (q :: Quant) m p where
-    SFMono :: m -> SFGADT 'Expr m p
-    SFPoly :: p -> SFGADT 'Expr m p
-    SFFunction :: SFGADT 'Expr m p -> SFGADT 'Expr m p -> SFGADT 'Expr m p
-    SFForall :: [p] -> SFGADT q m p -> SFGADT 'Quantify m p
 
 {-
 {-|
@@ -72,16 +61,8 @@ instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
         show' (Mono m) = show m
         show' (Poly p) = show p
         show' (Function a b) =
-            let isForall (Forall _ _) = True
-                isForall _ = False
-                astr = if isFunction a || isForall a then "(" ++ show' a ++ ")" else show' a
+            let astr = if isFunction a then "(" ++ show' a ++ ")" else show' a
             in  astr ++ " -> " ++ show' b
-        show' (Forall p expr) =
-            let getQuantified :: SystemF m p -> ([p], SystemF m p)
-                getQuantified (Forall _p _expr) = getQuantified _expr & _1 %~ (_p :)
-                getQuantified _expr             = ([], _expr)
-                (ps, _expr) = getQuantified expr
-            in "forall " ++ unwords (show <$> (p:ps)) ++ ". " ++ show' _expr
 
 deriveBifunctor ''SystemF
 deriveBifoldable ''SystemF
@@ -90,11 +71,11 @@ TH.deriveLift ''SystemF
 
 instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
-    type MonoType (SystemF m p) = m
+    type TypeConstant (SystemF m p) = m
 
-    abstract a b = systemFRaiseQuantifiers $ Function a b
+    abstract = Function
 
-    mono = Mono
+    typeconst = Mono
 
     equivalent = undefined -- areAlphaEquivalent
 
@@ -104,18 +85,61 @@ instance (Ord m, Ord p) => SimplyTypedUtil (SystemF m p) where
 
     bases = \case
         Function fun arg -> bases fun <> bases arg
-        Forall p expr    -> Set.insert (Poly p) (bases expr)
         expr             -> Set.singleton expr
 
-instance (Ord m, Ord p) => Polymorphic (SystemF m p) where
+instance (Ord m, Ord p) => Unify.Unifiable (SystemF m p) where
 
-    type UnifyError (SystemF m p) = ()
+    type Variable (SystemF m p) = p
 
-    unify = undefined
+    variable = typevar
 
-    type PolyType (SystemF m p) = p
+    vars = \case
+        Poly p -> Set.singleton p
+        Function a b -> Unify.vars a <> Unify.vars b
+        _ -> Set.empty
 
-    poly = Poly
+    type Constant (SystemF m p) = m
+
+    constant = typeconst
+
+    consts = \case
+        Mono m -> Set.singleton m
+        Function a b -> Unify.consts a <> Unify.consts b
+        _ -> Set.empty
+
+    applySubstitution target _substitution =
+        let
+            substitution = Unify.applySubstitution target _substitution _substitution
+            _applySubstitution = Unify.applySubstitution target substitution
+        in \case
+            ply@(Poly p)
+                | p == target -> substitution
+                | otherwise -> ply
+            Function a b -> Function (_applySubstitution a) (_applySubstitution b)
+            term -> term
+
+    disagreements a b =
+        let _disagreements = curry $ \case
+                (Poly p1, Poly p2) -> Val.Success $ Set.singleton (Unify.Alias p1 p2)
+                (Poly p , term)    -> Val.Success $ Set.singleton (Unify.Substitution p term)
+                (term   , Poly p)  -> Val.Success $ Set.singleton (Unify.Substitution p term)
+                (Function a1 b1, Function a2 b2) -> (<>) <$> _disagreements a1 a2 <*> _disagreements b1 b2
+                (term1, term2)
+                    | term1 == term2 -> Val.Success Set.empty
+                    | otherwise -> Val.Failure [(term1, term2)]
+        in validationToEither (_disagreements a b)
+
+instance (Ord m, Ord v) => Polymorphic (SystemF m v) where
+
+    type UnifyContext (SystemF m v) = ()
+
+    type UnifyError (SystemF m v) = Unify.FirstOrderSubsError Gr (SystemF m v) v
+
+    unify _ t1 t2 = ((), Unify.unifier t1 t2)
+
+    type TypeVariable (SystemF m v) = v
+
+    typevar = Poly
 
 {-
 instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF m p) where
@@ -199,47 +223,9 @@ instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF
 -}
 instance (Ord m, Ord p, Arbitrary m, Data m, Arbitrary p, Data p) => Arbitrary (SystemF m p) where
     -- TODO: remove instances of Data for m and p
-    arbitrary = process <$> sized (generatorSRWith aliases) where
+    arbitrary = sized (generatorSRWith aliases) where
         aliases :: [AliasR Gen]
         aliases = [
                     aliasR (\() -> arbitrary :: Gen m)
                   , aliasR (\() -> arbitrary :: Gen p)
                   ]
-
-        {-
-            Remove all generated quantifications and then generalise the expression's poly types.
-        -}
-        process = systemFMassUnquantify
-
-{-|
-    Internal function, makes sure all universal quantifiers appear at the \"top\" of
-    the type expression.
-
-    ===Behaviour
-
-    * Incorrectly quantified type expression
-
-        >>> systemFRaiseQuantifiers [sf| forall a b. a -> (forall c. b -> c) |]
-        [sf| forall a b c. a -> b -> c |]
-
-    * No quantifiers
-
-        >>> systemFRaiseQuantifiers [sf| X |]
-        [sf| X |]
-
-    * Already correctly quantified.
-
-        >>> systemFRaiseQuantifiers [sf| forall a b. a -> b |]
-        [sf| forall a b. a -> b |]
--}
-systemFRaiseQuantifiers :: (Ord m, Ord p) => SystemF m p -> SystemF m p
-systemFRaiseQuantifiers = systemFMassUnquantify
-
-{-|
-    Remove all quantifications from a SystemF expression.
--}
-systemFMassUnquantify :: (Ord m, Ord p) => SystemF m p -> SystemF m p
-systemFMassUnquantify t@Mono{} = t
-systemFMassUnquantify t@Poly{} = t
-systemFMassUnquantify (Function from to) = Function (systemFMassUnquantify from) (systemFMassUnquantify to)
-systemFMassUnquantify (Forall _ texpr) = systemFMassUnquantify texpr

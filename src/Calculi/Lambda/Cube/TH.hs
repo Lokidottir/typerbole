@@ -100,12 +100,12 @@ sfoexpr = label "System-Fω expression" $
 -}
 sfexpr :: LCParsec StringSF
 sfexpr = label "System-F expression" $
-          exprsequence (poly <$> variable
-                    <|> mono <$> constant
+          exprsequence (typevar <$> variable
+                    <|> typeconst <$> constant
                     <|> paren sfexpr)
 
 stlcexpr :: LCParsec StringSTLC
-stlcexpr = label "Simply-typed expression" $ exprsequence (mono <$> constant <|> paren stlcexpr)
+stlcexpr = label "Simply-typed expression" $ exprsequence (typeconst <$> constant <|> paren stlcexpr)
 
 {-
 {-|

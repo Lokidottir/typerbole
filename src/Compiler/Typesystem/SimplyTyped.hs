@@ -37,11 +37,11 @@ instance Foldable SimplyTyped where
         Function from to -> foldr f (foldr f z to) from
 
 instance Ord m => SimpleType (SimplyTyped m) where
-    type MonoType (SimplyTyped m) = m
+    type TypeConstant (SimplyTyped m) = m
 
     abstract = Function
 
-    mono = Mono
+    typeconst = Mono
 
     equivalent = (==)
 
