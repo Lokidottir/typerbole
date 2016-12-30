@@ -38,7 +38,7 @@ library
                      , Compiler.Typesystem.SystemF
                      , Compiler.Typesystem.SystemFOmega
                      , Compiler.Typesystem.SimplyTyped
-                     , Control.Typecheckable
+                     , Compiler.Typesystem.CalculusOfConstructions
                      , Data.Graph.Inductive.Helper
   build-depends:       base >= 4.7 && < 5
                      , containers >= 0.5 && < 0.6
@@ -57,6 +57,7 @@ library
                      , megaparsec
                      , safe
                      , unify-terms
+                     , parameterized-typesystems
   -- ghc-options:         -Wall
   --                      -fno-warn-type-defaults
   --                      -fno-warn-unused-do-bind

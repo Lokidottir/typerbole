@@ -7,6 +7,10 @@ packages:
         git: https://github.com/Lokidottir/unify-terms
         commit: 2e71a392b8685488a566117fb42f75bd58411722
       extra-dep: true
+    - location:
+        git: https://github.com/Lokidottir/parameterized-typesystems
+        commit: ce9aa76d55791ea02d09c8d1cbc4b005ce160608
+      extra-dep: true
 
 extra-deps:
     - generic-random-0.3.0.0

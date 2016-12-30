@@ -57,7 +57,7 @@ data SimplyTypedErr c v t =
       STNotKnownErr (NotKnownErr c v t)
     | STSimpleTypeErr (SimpleTypeErr t)
     deriving (Eq, Ord, Show)
-
+{-
 instance (Ord m, Ord c, Ord v) => Typecheckable (LambdaTerm c v) (SimplyTyped m) where
     type TypingContext (LambdaTerm c v) (SimplyTyped m) = (SimpleTypingContext c v (SimplyTyped m))
 
@@ -128,6 +128,6 @@ instance (Ord m, Ord c, Ord v) => Typecheckable (LambdaTerm c v) (SimplyTyped m)
                 (_, expr'type) <- typecheck env' expr
                 -- Return the environment and the type of the lambda expression.
                 return (env, var'type /-> expr'type)
-
+-}
 instance (Data m, Arbitrary m) => Arbitrary (SimplyTyped m) where
     arbitrary = sized $ generatorPWith [alias (\() -> arbitrary :: Gen m)]
