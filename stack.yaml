@@ -9,7 +9,7 @@ packages:
       extra-dep: true
     - location:
         git: https://github.com/Lokidottir/parameterized-typesystems
-        commit: ce9aa76d55791ea02d09c8d1cbc4b005ce160608
+        commit: e95c4f3805f599bcba961f91e361063755bd4e16
       extra-dep: true
 
 extra-deps:
