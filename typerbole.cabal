@@ -39,7 +39,7 @@ library
                      , Compiler.Typesystem.SystemFOmega
                      , Compiler.Typesystem.SimplyTyped
                      , Compiler.Typesystem.CalculusOfConstructions
-                     , Data.Graph.Inductive.Helper
+  other-modules:       Data.Graph.Inductive.Helper
   build-depends:       base >= 4.7 && < 5
                      , containers >= 0.5 && < 0.6
                      , data-ordlist
@@ -57,6 +57,7 @@ library
                      , megaparsec
                      , safe
                      , unify-terms
+                     , unification-fd
                      , parameterized-typesystems
   -- ghc-options:         -Wall
   --                      -fno-warn-type-defaults

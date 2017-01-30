@@ -1,16 +1,23 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Compiler.Typesystem.SimplyTyped where
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+module Compiler.Typesystem.SimplyTyped (
+    SimplyTyped(..)
+) where
 
 import           Calculi.Lambda
 import           Calculi.Lambda.Cube.SimpleType
 import           Control.Typecheckable.PureTypecheckable
+import           Control.Arrow ((>>>))
 import           Control.Monad
 import           Control.Lens
 import qualified Control.Monad.State            as State
 import qualified Control.Monad.Except           as Except
-import qualified Data.List.NonEmpty as NE
+import qualified Control.Unification            as U
+import qualified Data.List.NonEmpty             as NE
 import           Data.Bifunctor
 import           Data.Generics
 import qualified Data.Map                       as Map
@@ -18,28 +25,43 @@ import           Generic.Random.Data
 import           Data.Semigroup
 import qualified Data.Set                       as Set
 import           Test.QuickCheck
-import qualified Language.Haskell.TH.Lift as TH
+import qualified Language.Haskell.TH.Lift       as TH
 import           Data.Either.Validation
+import           Data.Functor.Fixedpoint
 
 {-|
     Data type describing a type system for simply-typed lambda calculus (λ→).
 -}
-data SimplyTyped c =
-      TypeCon c
+data SimplyTyped c
+    = TypeCon c
     | Function (SimplyTyped c) (SimplyTyped c)
-    deriving (Show, Read, Eq, Ord, Data)
+    deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
+
+-- | Inference intermediate for use with `unification-fd`
+data SimplyTypedII c ii
+    = TypeConII c
+    | FunctionII ii ii
+    deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
+
+toIntermediate :: SimplyTyped c -> Fix (SimplyTypedII c)
+toIntermediate = \case
+    TypeCon c -> Fix (TypeConII c)
+    Function a b -> Fix (toIntermediate a `FunctionII` toIntermediate b)
+
+fromIntermediate :: Fix (SimplyTypedII c) -> SimplyTyped c
+fromIntermediate = unFix >>> \case
+    TypeConII c -> TypeCon c
+    FunctionII a b -> fromIntermediate a `Function` fromIntermediate b
+
+instance Eq c => U.Unifiable (SimplyTypedII c) where
+    zipMatch t1 t2 = case (t1, t2) of
+        (TypeConII c1, TypeConII c2)
+            | c1 == c2 -> Just (TypeConII c1)
+            | otherwise -> Nothing
+        (FunctionII a b, FunctionII c d) -> Just $ Right (a, c) `FunctionII` Right (b, d)
+        _ -> Nothing
 
 TH.deriveLift ''SimplyTyped
-
-instance Functor SimplyTyped where
-    fmap f = \case
-        TypeCon c -> TypeCon (f c)
-        Function from to -> Function (fmap f from) (fmap f to)
-
-instance Foldable SimplyTyped where
-    foldr f z = \case
-        TypeCon c -> f c z
-        Function from to -> foldr f (foldr f z to) from
 
 instance Ord m => SimpleType (SimplyTyped m) where
     type TypeConstant (SimplyTyped m) = m
@@ -66,13 +88,14 @@ data SimplyTypedErr c v t =
 instance (Ord termcon, Ord var, Ord typecon) => PureTypecheckable (LambdaTerm termcon var) (SimplyTyped typecon) where
 
     type TypeError (LambdaTerm termcon var) (SimplyTyped typecon)
-        = [SimplyTypedErr termcon var (SimplyTyped typecon)]
+        = NE.NonEmpty (SimplyTypedErr termcon var (SimplyTyped typecon))
 
     type TypingContext (LambdaTerm termcon var) (SimplyTyped typecon)
         = SimpleTypingContext termcon var (SimplyTyped typecon)
 
     typecheckP term ctx = Except.runExcept $ State.runStateT (typecheckP_ term) ctx where
         typecheckP_ :: forall t term tyctx tyerr m.
+                    -- Make lots of aliases so types are readable
                     ( t ~ (SimplyTyped typecon)
                     , term ~ (LambdaTerm termcon var)
                     , tyctx ~ TypingContext term t
@@ -127,6 +150,39 @@ instance (Ord termcon, Ord var, Ord typecon) => PureTypecheckable (LambdaTerm te
                 Constant c -> constlookup c
                 Apply f x -> termAp f x
                 Lambda declr term -> lambda declr term
+
+instance (Ord termcon, Ord var, Ord typecon) => PureInferable (LambdaTerm termcon var) (SimplyTyped typecon) where
+
+    type InferError (LambdaTerm termcon var) (SimplyTyped typecon)
+        = TypeError (LambdaTerm termcon var) (SimplyTyped typecon)
+
+    type InferContext (LambdaTerm termcon var) (SimplyTyped typecon)
+        = TypingContext (LambdaTerm termcon var) (SimplyTyped typecon)
+
+    inferP = undefined where
+        inferP_ :: forall t it ut term tyctx tyerr m.
+                -- Make lots of aliases so types are readable
+                ( t ~ SimplyTyped typecon
+                -- , it ~ SimplyTypedII typecon
+                -- , ut ~ U.UTerm it
+                , term ~ LambdaTerm termcon var
+                , tyctx ~ InferContext term t
+                , tyerr ~ InferError term t
+                , m ~ State.StateT tyctx (Except.Except tyerr)
+                )
+                => term (Maybe t)
+                -> m (term t)
+        inferP_ = inferP_final <=< inferP_preprocess where
+
+            -- | give all the untyped variables an index for their type.
+            inferP_preprocess :: term (Maybe t) -> m (term (Either Integer t))
+            inferP_preprocess = undefined
+
+            inferP_final :: term (Either Integer t) -> m (term t)
+            inferP_final = \case
+                Variable v -> return $ Variable v
+                Constant c -> return $ Constant c
+                _ -> undefined
 
 instance (Data m, Arbitrary m) => Arbitrary (SimplyTyped m) where
     arbitrary = sized $ generatorPWith [alias (\() -> arbitrary :: Gen m)]

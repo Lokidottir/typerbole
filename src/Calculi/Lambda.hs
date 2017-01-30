@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 module Calculi.Lambda (
       -- * Typed Lambda Calculus AST.
       LambdaTerm(..)
@@ -40,14 +43,11 @@ data LambdaTerm c v t =
     | Lambda (v, t) (LambdaTerm c v t)
       -- ^ A lambda expression, with a variable definition and
       -- a function body.
-    deriving (Eq, Ord, Show, Data)
+    deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
 
 deriveBifunctor ''LambdaTerm
 deriveBifoldable ''LambdaTerm
 deriveBitraversable ''LambdaTerm
-
-instance Functor (LambdaTerm c v) where
-    fmap = second
 
 instance (Arbitrary c, Data c,
           Arbitrary v, Data v,
