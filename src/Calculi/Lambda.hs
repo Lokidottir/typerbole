@@ -17,9 +17,7 @@ module Calculi.Lambda (
 ) where
 
 import           Data.Bifunctor.TH
-import           Data.Bifunctor (second)
-import           Data.Either.Combinators
-import           Data.Either (lefts, partitionEithers)
+import           Data.Either (partitionEithers)
 import           Data.Generics (Data(..))
 import           Data.Graph.Inductive
 import           Data.Graph.Inductive.Helper

@@ -5,7 +5,9 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 module Compiler.Typesystem.SimplyTyped (
-    SimplyTyped(..)
+      SimplyTyped(..)
+    , SimplyTypedInferErr(..)
+    , SimplyTypedTypeErr(..)
 ) where
 
 import           Calculi.Lambda
@@ -17,16 +19,16 @@ import           Control.Lens
 import qualified Control.Monad.State            as State
 import qualified Control.Monad.Except           as Except
 import qualified Control.Unification            as U
+import qualified Control.Unification.IntVar     as U
+import qualified Control.Unification.Types      as U
 import qualified Data.List.NonEmpty             as NE
-import           Data.Bifunctor
 import           Data.Generics
 import qualified Data.Map                       as Map
+import           Data.Traversable               (for)
 import           Generic.Random.Data
-import           Data.Semigroup
 import qualified Data.Set                       as Set
 import           Test.QuickCheck
 import qualified Language.Haskell.TH.Lift       as TH
-import           Data.Either.Validation
 import           Data.Functor.Fixedpoint
 
 {-|
@@ -43,15 +45,26 @@ data SimplyTypedII c ii
     | FunctionII ii ii
     deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
 
+-- | Transform a `SimplyTyped` into it's inference intermediate
 toIntermediate :: SimplyTyped c -> Fix (SimplyTypedII c)
 toIntermediate = \case
     TypeCon c -> Fix (TypeConII c)
     Function a b -> Fix (toIntermediate a `FunctionII` toIntermediate b)
 
+-- | Get a `SimplyTyped` from it's inference intermediate
 fromIntermediate :: Fix (SimplyTypedII c) -> SimplyTyped c
 fromIntermediate = unFix >>> \case
     TypeConII c -> TypeCon c
     FunctionII a b -> fromIntermediate a `Function` fromIntermediate b
+
+-- | Transform a UTerm into a `SimplyTyped` that considers any remaining type variables
+-- as `Left`s.
+unUTerm :: U.Variable v => U.UTerm (SimplyTypedII typecon) v -> SimplyTyped (Either Int typecon)
+unUTerm = \case
+    U.UVar v -> TypeCon . Left $ U.getVarID v
+    U.UTerm term -> case term of
+        a `FunctionII` b -> unUTerm a `Function` unUTerm b
+        TypeConII c -> TypeCon . Right $ c
 
 instance Eq c => U.Unifiable (SimplyTypedII c) where
     zipMatch t1 t2 = case (t1, t2) of
@@ -60,6 +73,19 @@ instance Eq c => U.Unifiable (SimplyTypedII c) where
             | otherwise -> Nothing
         (FunctionII a b, FunctionII c d) -> Just $ Right (a, c) `FunctionII` Right (b, d)
         _ -> Nothing
+
+-- | Inference error, with the only occurence of type variables for `SimplyTyped`
+data SimplyTypedInferErr typevar typecon
+    = STOccursFailure typevar (SimplyTyped (Either typevar typecon))
+    -- ^ There was a cyclic substitution
+    | STInferenceMismatch (SimplyTyped (Either typevar typecon))
+                          (SimplyTyped (Either typevar typecon))
+    -- ^ There was a mismatch in structure
+    deriving (Eq, Ord, Show, Functor)
+
+instance U.Variable v => U.Fallible (SimplyTypedII typecon) v (SimplyTypedInferErr Int typecon) where
+     occursFailure v t = STOccursFailure (U.getVarID v) (unUTerm t)
+     mismatchFailure t1 t2 = STInferenceMismatch (unUTerm (U.UTerm t1)) (unUTerm (U.UTerm t2))
 
 TH.deriveLift ''SimplyTyped
 
@@ -80,7 +106,7 @@ instance Ord m => SimplyTypedUtil (SimplyTyped m) where
     bases (TypeCon c)           = Set.singleton (TypeCon c)
     bases (Function from to) = bases from `Set.union` bases to
 
-data SimplyTypedErr c v t =
+data SimplyTypedTypeErr c v t =
       STNotKnownErr (NotKnownErr c v t)
     | STSimpleTypeErr (SimpleTypeErr t)
     deriving (Eq, Ord, Show)
@@ -88,12 +114,12 @@ data SimplyTypedErr c v t =
 instance (Ord termcon, Ord var, Ord typecon) => PureTypecheckable (LambdaTerm termcon var) (SimplyTyped typecon) where
 
     type TypeError (LambdaTerm termcon var) (SimplyTyped typecon)
-        = NE.NonEmpty (SimplyTypedErr termcon var (SimplyTyped typecon))
+        = NE.NonEmpty (SimplyTypedTypeErr termcon var (SimplyTyped typecon))
 
     type TypingContext (LambdaTerm termcon var) (SimplyTyped typecon)
         = SimpleTypingContext termcon var (SimplyTyped typecon)
 
-    typecheckP term ctx = Except.runExcept $ State.runStateT (typecheckP_ term) ctx where
+    typecheckP term_ ctx_ = Except.runExcept $ State.runStateT (typecheckP_ term_) ctx_ where
         typecheckP_ :: forall t term tyctx tyerr m.
                     -- Make lots of aliases so types are readable
                     ( t ~ (SimplyTyped typecon)
@@ -134,6 +160,9 @@ instance (Ord termcon, Ord var, Ord typecon) => PureTypecheckable (LambdaTerm te
 
             lambda :: (var, t) -> term t -> m t
             lambda (v, t) term =
+                -- Add the defined variable with it's type to the state, returning
+                -- to the original state once `term` has been typechecked so that
+                -- `term` does not affect the outer scope.
                 withTempState (variables %~ Map.insert v t) $ (t /->) <$> typecheckP_ term where
                     -- Perform an action with a modified state, returning the
                     -- state to it's orginal form once the action is complete.
@@ -154,35 +183,54 @@ instance (Ord termcon, Ord var, Ord typecon) => PureTypecheckable (LambdaTerm te
 instance (Ord termcon, Ord var, Ord typecon) => PureInferable (LambdaTerm termcon var) (SimplyTyped typecon) where
 
     type InferError (LambdaTerm termcon var) (SimplyTyped typecon)
-        = TypeError (LambdaTerm termcon var) (SimplyTyped typecon)
+        = NE.NonEmpty (Either (SimplyTypedInferErr Int termcon)
+                              (SimplyTypedTypeErr termcon var (SimplyTyped typecon)))
 
     type InferContext (LambdaTerm termcon var) (SimplyTyped typecon)
         = TypingContext (LambdaTerm termcon var) (SimplyTyped typecon)
 
     inferP = undefined where
-        inferP_ :: forall t it ut term tyctx tyerr m.
+        inferP_ :: forall t it ut v term infctx inferr (m :: * -> *).
                 -- Make lots of aliases so types are readable
-                ( t ~ SimplyTyped typecon
-                -- , it ~ SimplyTypedII typecon
-                -- , ut ~ U.UTerm it
+                ( v ~ U.IntVar
+                , t ~ SimplyTyped typecon
+                , it ~ SimplyTypedII typecon
+                , ut ~ U.UTerm it v
                 , term ~ LambdaTerm termcon var
-                , tyctx ~ InferContext term t
-                , tyerr ~ InferError term t
-                , m ~ State.StateT tyctx (Except.Except tyerr)
+                , infctx ~ InferContext term t
+                , inferr ~ InferError term t
+                , m ~ Except.ExceptT inferr (U.IntBindingT it Identity)
+                , U.BindingMonad it v m
                 )
                 => term (Maybe t)
                 -> m (term t)
-        inferP_ = inferP_final <=< inferP_preprocess where
+        inferP_ = inferP_final where
 
-            -- | give all the untyped variables an index for their type.
-            inferP_preprocess :: term (Maybe t) -> m (term (Either Integer t))
-            inferP_preprocess = undefined
+            -- | Transform the type annotations of the term into unification-fd
+            -- compatable types
+            ufdTransform :: term (Maybe t) -> m (term ut)
+            ufdTransform = traverse $ \case
+                -- Annotated terms get transformed into the intermediate
+                -- before being transformed again into a UTerm.
+                Just t -> return . U.unfreeze . toIntermediate $ t
+                -- Unannotated terms get a new free variable.
+                Nothing -> U.UVar <$> U.freeVar
 
-            inferP_final :: term (Either Integer t) -> m (term t)
-            inferP_final = \case
-                Variable v -> return $ Variable v
-                Constant c -> return $ Constant c
-                _ -> undefined
+            -- | Turn an intermediate ufd term back into the original term
+            unUFDTrans :: term ut -> m (term t)
+            unUFDTrans = undefined -- U.applyBindingsAll >=>
+                -- We need to apply all bindings, then build the variable-free term
+                -- back up while either reporting or monomorphising any types
+                -- that are still variables.
+
+            inferP_final :: term (Maybe t) -> m (term t)
+            inferP_final term_ = case sequenceA term_ of
+                -- All declared variables are annotated, but still within `Maybe`
+                -- now extracted by `sequenceA`. This is an optimisation to
+                -- avoid a couple of transformations on the AST.
+                Just term -> return term
+                -- There's missing annotations, do type inference.
+                Nothing -> undefined
 
 instance (Data m, Arbitrary m) => Arbitrary (SimplyTyped m) where
     arbitrary = sized $ generatorPWith [alias (\() -> arbitrary :: Gen m)]
