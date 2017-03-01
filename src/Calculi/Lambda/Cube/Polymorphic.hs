@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Calculi.Lambda.Cube.Polymorphic (
     -- * Typeclass for Polymorphic Typesystems
       Polymorphic(..)
@@ -7,21 +8,9 @@ module Calculi.Lambda.Cube.Polymorphic (
 import           Calculi.Lambda.Cube.SimpleType
 
 {-|
-    Class of typesystems that exhibit polymorphism.
+    Class of typesystems that exhibit polymorphism. Expecting OS
 -}
-class (Ord (TypeVariable t), SimpleType t) => Polymorphic t where
-
-    {-|
-        The type that reports any possible errors that occur during unification.
-    -}
-    type UnifyError t :: *
-
-    {-|
-        The context for unification, in many typesystems this may be `()` but in others
-        it might be information on the kinds of constants or background knowledge related
-        to rewriting terms.
-    -}
-    type UnifyContext t :: *
+class (Ord (TypeVariable t), SimpleType t, Monad m) => Polymorphic t m where
 
     {-|
         Unify two given type expressions.
@@ -30,7 +19,7 @@ class (Ord (TypeVariable t), SimpleType t) => Polymorphic t where
 
         *
           Law: A unification function between two terms must produce equivalent expressions
-          when applied to the two terms
+          when applied to the two terms or fail to unify.
 
             @
             -- Two type expressions ...
@@ -41,10 +30,7 @@ class (Ord (TypeVariable t), SimpleType t) => Polymorphic t where
             > False
 
             -- ... are equivalent when unified, or cannot be unified at all.
-            case unify a b of
-                Left err -> True -- This property doesn't care about failures
-                Right u -> u a ==== u b
-            > True
+            (unify a b >>= \u -> u a ==== u b) = (unify a b >> return True)
             @
 
         *
@@ -59,15 +45,12 @@ class (Ord (TypeVariable t), SimpleType t) => Polymorphic t where
             > True
 
             -- ... will always unify.
-            case unify a b of
-                Left err -> False
-                Right u -> u a ==== u b
-            > True
+            (unify a b >>= \u -> u a ==== u b) = (return True)
 
             -- Additionally: "u a", "u b", "a", and "b" are all equivalent to eachother.
             @
     -}
-    unify :: UnifyContext t -> t -> t -> (UnifyContext t, Either [UnifyError t] (t -> t))
+    unify :: t -> t -> m (t -> t)
 
     {-|
         The representation of a type variable.

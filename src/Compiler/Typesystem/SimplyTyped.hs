@@ -21,6 +21,7 @@ import qualified Control.Monad.Except           as Except
 import qualified Control.Unification            as U
 import qualified Control.Unification.IntVar     as U
 import qualified Control.Unification.Types      as U
+import qualified Compiler.Typesystem.SystemF    as SF
 import qualified Data.List.NonEmpty             as NE
 import           Data.Generics
 import qualified Data.Map                       as Map
@@ -88,6 +89,12 @@ instance U.Variable v => U.Fallible (SimplyTypedII typecon) v (SimplyTypedInferE
      mismatchFailure t1 t2 = STInferenceMismatch (unUTerm (U.UTerm t1)) (unUTerm (U.UTerm t2))
 
 TH.deriveLift ''SimplyTyped
+
+monomorphise :: c -> SF.SystemF c v -> SimplyTyped c
+monomorphise fill = \case
+    SF.TypeVar _ -> TypeCon fill
+    SF.TypeCon c -> TypeCon c
+    SF.Function a b -> Function (monomorphise fill a) (monomorphise fill b)
 
 instance Ord m => SimpleType (SimplyTyped m) where
     type TypeConstant (SimplyTyped m) = m

@@ -34,12 +34,12 @@ import qualified Language.Haskell.TH.Lift as TH
     An implementation of System-F, similar to haskell's own typesystems but without
     type-level functions beyond (→)
 -}
-data SystemF m p =
-      Mono m
-      -- ^ Mono types/type constants, i.e. @Int@ or @String@
-    | Poly p
+data SystemF c v =
+      TypeCon c
+      -- ^ TypeCon types/type constants, i.e. @Int@ or @String@
+    | TypeVar v
       -- ^ Poly types/type variables, i. e. the @a@ a -> Int@
-    | Function (SystemF m p) (SystemF m p)
+    | Function (SystemF c v) (SystemF c v)
       -- ^ Function type constructor, i e. @->@ in @a -> b@
     deriving (Eq, Ord, Data)
 
@@ -58,8 +58,8 @@ deriving instance (Polymorphic t, Show v, Show c, Show t, Show (PolyType t)) => 
 -}
 instance (Ord m, Ord p, Show m, Show p) => Show (SystemF m p) where
     show t = "[sf| " ++ show' t ++ " |]" where
-        show' (Mono m) = show m
-        show' (Poly p) = show p
+        show' (TypeCon m) = show m
+        show' (TypeVar p) = show p
         show' (Function a b) =
             let astr = if isFunction a then "(" ++ show' a ++ ")" else show' a
             in  astr ++ " -> " ++ show' b
@@ -75,7 +75,7 @@ instance (Ord m, Ord p) => SimpleType (SystemF m p) where
 
     abstract = Function
 
-    typeconst = Mono
+    typeconst = TypeCon
 
     equivalent = Unify.areAlphaEquivalent
 
@@ -94,7 +94,7 @@ instance (Ord m, Ord p) => Unify.Unifiable (SystemF m p) where
     variable = typevar
 
     vars = \case
-        Poly p -> Set.singleton p
+        TypeVar p -> Set.singleton p
         Function a b -> Unify.vars a <> Unify.vars b
         _ -> Set.empty
 
@@ -103,7 +103,7 @@ instance (Ord m, Ord p) => Unify.Unifiable (SystemF m p) where
     constant = typeconst
 
     consts = \case
-        Mono m -> Set.singleton m
+        TypeCon m -> Set.singleton m
         Function a b -> Unify.consts a <> Unify.consts b
         _ -> Set.empty
 
@@ -112,7 +112,7 @@ instance (Ord m, Ord p) => Unify.Unifiable (SystemF m p) where
             substitution = Unify.applySubstitution target _substitution _substitution
             _applySubstitution = Unify.applySubstitution target substitution
         in \case
-            ply@(Poly p)
+            ply@(TypeVar p)
                 | p == target -> substitution
                 | otherwise -> ply
             Function a b -> Function (_applySubstitution a) (_applySubstitution b)
@@ -120,9 +120,9 @@ instance (Ord m, Ord p) => Unify.Unifiable (SystemF m p) where
 
     disagreements a b =
         let _disagreements = curry $ \case
-                (Poly p1, Poly p2) -> Val.Success $ Set.singleton (Unify.Alias p1 p2)
-                (Poly p , term)    -> Val.Success $ Set.singleton (Unify.Substitution p term)
-                (term   , Poly p)  -> Val.Success $ Set.singleton (Unify.Substitution p term)
+                (TypeVar p1, TypeVar p2) -> Val.Success $ Set.singleton (Unify.Alias p1 p2)
+                (TypeVar p , term)    -> Val.Success $ Set.singleton (Unify.Substitution p term)
+                (term   , TypeVar p)  -> Val.Success $ Set.singleton (Unify.Substitution p term)
                 (Function a1 b1, Function a2 b2) -> (<>) <$> _disagreements a1 a2 <*> _disagreements b1 b2
                 (term1, term2)
                     | term1 == term2 -> Val.Success Set.empty
@@ -139,7 +139,7 @@ instance (Ord m, Ord v) => Polymorphic (SystemF m v) where
 
     type TypeVariable (SystemF m v) = v
 
-    typevar = Poly
+    typevar = TypeVar
 
 {-
 instance (Ord c, Ord v, Ord m, Ord p) => Typecheckable (LambdaTerm c v) (SystemF m p) where
